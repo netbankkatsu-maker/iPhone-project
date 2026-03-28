@@ -1,149 +1,133 @@
 // ─── Audio Manager ───────────────────────────────────────────
-// Generates sounds procedurally using Web Audio API (no files needed)
+// Low-latency procedural audio using pre-generated buffers
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private enabled = true;
+  private buffers: Map<string, AudioBuffer> = new Map();
+  private resumed = false;
 
   constructor() {
     try {
       this.ctx = new AudioContext();
+      // Pre-generate buffers once
+      this.pregenerate();
+      // Resume on any user gesture (critical for mobile latency)
+      const resume = () => {
+        if (this.ctx && this.ctx.state === "suspended") {
+          this.ctx.resume();
+        }
+        this.resumed = true;
+      };
+      document.addEventListener("touchstart", resume, { once: false, passive: true });
+      document.addEventListener("pointerdown", resume, { once: false, passive: true });
     } catch {
       this.enabled = false;
     }
   }
 
-  private ensureContext() {
-    if (!this.ctx || !this.enabled) return null;
+  private pregenerate() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const sr = ctx.sampleRate;
+
+    // Shoot sounds (short noise bursts with pitch)
+    this.buffers.set("shoot_pistol", this.genShot(sr, 200, 0.08, 0.12));
+    this.buffers.set("shoot_smg", this.genShot(sr, 300, 0.05, 0.08));
+    this.buffers.set("shoot_shotgun", this.genShot(sr, 100, 0.15, 0.2));
+    this.buffers.set("shoot_rifle", this.genShot(sr, 150, 0.1, 0.15));
+
+    // Hit
+    this.buffers.set("hit", this.genTone(sr, 800, 200, 0.05, 0.1));
+
+    // Damage (noise)
+    this.buffers.set("damage", this.genNoise(sr, 0.08, 0.15));
+
+    // Explosion (long noise)
+    this.buffers.set("explosion", this.genNoise(sr, 0.3, 0.3));
+
+    // Pickup (ascending tone)
+    this.buffers.set("pickup", this.genTone(sr, 400, 800, 0.08, 0.08));
+
+    // Extract (multi-tone)
+    this.buffers.set("extract", this.genExtract(sr));
+  }
+
+  private genShot(sr: number, freq: number, dur: number, vol: number): AudioBuffer {
+    const len = Math.floor(sr * dur);
+    const buf = this.ctx!.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      const t = i / sr;
+      const env = Math.exp(-t * 30);
+      const f = freq * Math.exp(-t * 20);
+      // Square wave + noise
+      const sq = Math.sign(Math.sin(2 * Math.PI * f * t));
+      const noise = Math.random() * 2 - 1;
+      d[i] = (sq * 0.6 + noise * 0.4) * env * vol;
+    }
+    return buf;
+  }
+
+  private genTone(sr: number, f1: number, f2: number, dur: number, vol: number): AudioBuffer {
+    const len = Math.floor(sr * dur);
+    const buf = this.ctx!.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      const t = i / sr;
+      const p = t / dur;
+      const freq = f1 + (f2 - f1) * p;
+      const env = 1 - p;
+      d[i] = Math.sin(2 * Math.PI * freq * t) * env * vol;
+    }
+    return buf;
+  }
+
+  private genNoise(sr: number, dur: number, vol: number): AudioBuffer {
+    const len = Math.floor(sr * dur);
+    const buf = this.ctx!.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      const env = Math.pow(1 - i / len, 2);
+      d[i] = (Math.random() * 2 - 1) * env * vol;
+    }
+    return buf;
+  }
+
+  private genExtract(sr: number): AudioBuffer {
+    const dur = 0.7;
+    const len = Math.floor(sr * dur);
+    const buf = this.ctx!.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    const notes = [400, 500, 600, 800];
+    for (let i = 0; i < len; i++) {
+      const t = i / sr;
+      const noteIdx = Math.min(Math.floor(t / 0.15), notes.length - 1);
+      const noteT = t - noteIdx * 0.15;
+      const env = Math.max(0, 1 - noteT / 0.18);
+      d[i] = Math.sin(2 * Math.PI * notes[noteIdx] * t) * env * 0.08;
+    }
+    return buf;
+  }
+
+  private play(key: string) {
+    if (!this.ctx || !this.enabled) return;
     if (this.ctx.state === "suspended") this.ctx.resume();
-    return this.ctx;
+    const buf = this.buffers.get(key);
+    if (!buf) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(this.ctx.destination);
+    src.start(0);
   }
 
   playShoot(type: "pistol" | "smg" | "shotgun" | "rifle" = "pistol") {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    const now = ctx.currentTime;
-    const params: Record<string, [number, number, number]> = {
-      pistol: [200, 0.12, 0.08],
-      smg: [300, 0.08, 0.05],
-      shotgun: [100, 0.2, 0.15],
-      rifle: [150, 0.15, 0.1],
-    };
-    const [freq, vol, dur] = params[type] || params.pistol;
-
-    osc.type = "square";
-    osc.frequency.setValueAtTime(freq, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + dur);
-
-    gain.gain.setValueAtTime(vol, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-
-    osc.start(now);
-    osc.stop(now + dur);
+    this.play(`shoot_${type}`);
   }
 
-  playHit() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    const now = ctx.currentTime;
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(200, now + 0.05);
-    gain.gain.setValueAtTime(0.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    osc.start(now);
-    osc.stop(now + 0.05);
-  }
-
-  playDamage() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-
-    const bufferSize = ctx.sampleRate * 0.1;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
-    }
-
-    const source = ctx.createBufferSource();
-    const gain = ctx.createGain();
-    source.buffer = buffer;
-    source.connect(gain);
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-    source.start();
-  }
-
-  playExplosion() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-
-    const bufferSize = ctx.sampleRate * 0.4;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
-    }
-
-    const source = ctx.createBufferSource();
-    const gain = ctx.createGain();
-    source.buffer = buffer;
-    source.connect(gain);
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    source.start();
-  }
-
-  playPickup() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    const now = ctx.currentTime;
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(400, now);
-    osc.frequency.linearRampToValueAtTime(800, now + 0.08);
-    gain.gain.setValueAtTime(0.08, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-    osc.start(now);
-    osc.stop(now + 0.1);
-  }
-
-  playExtract() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-    [400, 500, 600, 800].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, now + i * 0.12);
-      gain.gain.setValueAtTime(0.08, now + i * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.2);
-      osc.start(now + i * 0.12);
-      osc.stop(now + i * 0.12 + 0.2);
-    });
-  }
+  playHit() { this.play("hit"); }
+  playDamage() { this.play("damage"); }
+  playExplosion() { this.play("explosion"); }
+  playPickup() { this.play("pickup"); }
+  playExtract() { this.play("extract"); }
 }
