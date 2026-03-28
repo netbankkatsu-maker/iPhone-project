@@ -95,6 +95,7 @@ export class RaidScene extends Phaser.Scene {
   private inventoryUI!: InventoryUI;
   private invButton!: Phaser.GameObjects.Text;
   private nearbyLootContainer: Phaser.GameObjects.Rectangle | null = null;
+  private lootButton!: Phaser.GameObjects.Container;
 
   // Survival
   private survival!: SurvivalStats;
@@ -292,10 +293,24 @@ export class RaidScene extends Phaser.Scene {
       if (this.inventoryUI.getIsOpen()) {
         this.inventoryUI.close();
       } else {
-        // Check if near loot container
-        const lootInv = this.nearbyLootContainer?.active
-          ? (this.nearbyLootContainer.getData("lootInventory") as GridInventory)
-          : undefined;
+        this.inventoryUI.open();
+      }
+    });
+
+    // Loot button (appears when near loot container)
+    const lootBg = this.add.rectangle(0, 0, 70, 32, 0xb08030, 0.85);
+    lootBg.setStrokeStyle(1, 0xd4a840);
+    lootBg.setInteractive();
+    const lootLabel = this.add.text(0, 0, "LOOT", {
+      fontFamily: "monospace", fontSize: "14px", color: "#ffffff",
+    }).setOrigin(0.5);
+    this.lootButton = this.add.container(w / 2, h * 0.6, [lootBg, lootLabel])
+      .setScrollFactor(0)
+      .setDepth(HUD_DEPTH + 2)
+      .setVisible(false);
+    lootBg.on("pointerdown", () => {
+      if (this.nearbyLootContainer?.active) {
+        const lootInv = this.nearbyLootContainer.getData("lootInventory") as GridInventory;
         this.inventoryUI.open(lootInv);
       }
     });
@@ -416,6 +431,7 @@ export class RaidScene extends Phaser.Scene {
     this.moveStick.reposition(w * 0.15, h * 0.7);
     this.aimStick.reposition(w * 0.85, h * 0.7);
     this.hud.onResize();
+    this.lootButton.setPosition(w / 2, h * 0.6);
   }
 
   update(_time: number, delta: number) {
@@ -681,10 +697,10 @@ export class RaidScene extends Phaser.Scene {
       if (dist < 35) {
         nearLoot = true;
         this.nearbyLootContainer = box;
-        this.hud.showInteractHint("Tap [BAG] to loot");
         break;
       }
     }
+    this.lootButton.setVisible(nearLoot);
     if (!nearLoot) this.hud.hideInteractHint();
   }
 

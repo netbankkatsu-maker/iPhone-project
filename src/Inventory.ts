@@ -257,13 +257,15 @@ export class InventoryUI {
     const sw = this.scene.scale.width;
     const sh = this.scene.scale.height;
 
-    // Semi-transparent background (not interactive - let clicks pass through to buttons)
+    // Semi-transparent background - tap to close
     this.bg = this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x000000, 0.85);
+    this.bg.setInteractive();
+    this.bg.on("pointerdown", () => this.close());
     this.container.add(this.bg);
 
     // Title
     const title = this.scene.add.text(sw / 2, 12, "INVENTORY", {
-      fontFamily: "monospace", fontSize: "14px", color: "#00e676",
+      fontFamily: "monospace", fontSize: "14px", color: "#7a9e5a",
     }).setOrigin(0.5, 0);
     this.container.add(title);
 
@@ -292,15 +294,19 @@ export class InventoryUI {
       this.drawGrid(invX, lootY, this.lootInventory, this.lootCellGraphics, this.lootItemVisuals, "loot");
     }
 
-    // Close button (large tap target)
-    const closeBg = this.scene.add.rectangle(sw - 24, 20, 40, 32, 0xff5252, 0.3)
+    // Close button (large tap target) - top-right X
+    const closeBg = this.scene.add.rectangle(sw - 28, 22, 48, 36, 0xc04040, 0.5)
       .setInteractive();
+    closeBg.setStrokeStyle(1, 0xc04040);
     this.container.add(closeBg);
-    const closeBtn = this.scene.add.text(sw - 24, 20, "CLOSE", {
-      fontFamily: "monospace", fontSize: "11px", color: "#ff5252",
+    const closeBtn = this.scene.add.text(sw - 28, 22, "X", {
+      fontFamily: "monospace", fontSize: "18px", color: "#ffffff",
     }).setOrigin(0.5);
     this.container.add(closeBtn);
-    closeBg.on("pointerdown", () => this.close());
+    closeBg.on("pointerdown", (p: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.close();
+    });
   }
 
   private drawEquipSlots(startX: number, startY: number) {
@@ -338,7 +344,8 @@ export class InventoryUI {
         this.container.add(itemName);
 
         // Tap to unequip
-        slotBg.on("pointerdown", () => {
+        slotBg.on("pointerdown", (_p: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
+          event.stopPropagation();
           this.equippedItems.delete(slotDef.key);
           this.inventory.autoAdd(equipped.defId, equipped.quantity);
           if (this.onEquipCallback) this.onEquipCallback(slotDef.key, null);
@@ -403,9 +410,10 @@ export class InventoryUI {
       this.container.add(itemContainer);
       itemStore.set(item, itemContainer);
 
-      // Tap to interact
+      // Tap to interact (stopPropagation prevents bg close)
       itemRect.setInteractive();
-      itemRect.on("pointerdown", () => {
+      itemRect.on("pointerdown", (_p: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
+        event.stopPropagation();
         this.onItemTap(item, source, inv);
       });
     }
