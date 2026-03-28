@@ -15,7 +15,7 @@ export const WEAPONS = {
     spread: 0.05,
     magSize: 12,
     reloadTime: 1500,
-    color: 0xffeb3b,
+    color: 0xd4a840,     // brass
     auto: false,
   },
   smg: {
@@ -26,7 +26,7 @@ export const WEAPONS = {
     spread: 0.12,
     magSize: 30,
     reloadTime: 2000,
-    color: 0xff9800,
+    color: 0xc8a030,     // darker brass
     auto: true,
   },
   shotgun: {
@@ -37,7 +37,7 @@ export const WEAPONS = {
     spread: 0.25,
     magSize: 6,
     reloadTime: 2500,
-    color: 0xff5722,
+    color: 0xb87020,     // copper
     auto: false,
     pellets: 5,
   },
@@ -49,7 +49,7 @@ export const WEAPONS = {
     spread: 0.02,
     magSize: 5,
     reloadTime: 2200,
-    color: 0x4caf50,
+    color: 0xa09060,     // steel gray-gold
     auto: false,
   },
 } as const;
@@ -70,7 +70,7 @@ export const ENEMY_TYPES = {
     fireRate: 1200,
     detectionRange: 250,
     attackRange: 200,
-    color: 0xe53935,
+    color: 0x8b5e3c,      // dirty brown (ragged clothing)
     radius: 12,
     loot: ["ammo", "bandage"],
   },
@@ -82,7 +82,7 @@ export const ENEMY_TYPES = {
     fireRate: 0, // melee only
     detectionRange: 200,
     attackRange: 30,
-    color: 0x8e24aa,
+    color: 0x556b2f,       // dark olive green (irradiated)
     radius: 16,
     loot: ["meat", "mutant_part"],
   },
@@ -94,7 +94,7 @@ export const ENEMY_TYPES = {
     fireRate: 800,
     detectionRange: 300,
     attackRange: 280,
-    color: 0xc62828,
+    color: 0x5a3a3a,       // dark maroon (heavy armor)
     radius: 18,
     loot: ["ammo", "medkit", "weapon_part"],
   },
@@ -107,19 +107,19 @@ export const MAP_W = 3000;
 export const MAP_H = 3000;
 export const TILE_SIZE = 100;
 
-// Colors
+// Colors – muted survival palette (earthy / military tones)
 export const COLORS = {
-  ground: 0x2a2a3e,
-  wall: 0x5a5a7a,
-  playerAlive: 0x00e676,
-  playerHurt: 0xff5252,
-  extraction: 0x00e5ff,
-  extractionGlow: 0x00838f,
-  hpBar: 0x4caf50,
-  hpBarBg: 0x333333,
-  ammoText: 0xccccee,
-  lootContainer: 0xffc107,
-  bullet: 0xffeb3b,
+  ground: 0x1a1f14,       // dark forest floor
+  wall: 0x4a4a3a,         // concrete / stone
+  playerAlive: 0x7a9e5a,  // olive drab
+  playerHurt: 0xc44040,   // blood red
+  extraction: 0x40b0a0,   // teal beacon
+  extractionGlow: 0x306860,
+  hpBar: 0x5c8a3c,        // military green
+  hpBarBg: 0x2a2a22,
+  ammoText: 0xb8b0a0,     // parchment
+  lootContainer: 0xb08030, // wooden crate
+  bullet: 0xd4a840,       // brass
 } as const;
 
 // UI

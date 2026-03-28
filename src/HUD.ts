@@ -37,7 +37,7 @@ export class HUD {
     const textStyle = {
       fontFamily: "monospace",
       fontSize: "12px",
-      color: "#ccccee",
+      color: "#b8b0a0",
     };
 
     // HP bar
@@ -64,28 +64,28 @@ export class HUD {
 
     // Hunger
     this.hungerBarBg = scene.add.rectangle(startX, barY, barW, barH, 0x333333).setScrollFactor(0).setDepth(HUD_DEPTH);
-    this.hungerBar = scene.add.rectangle(startX, barY, barW, barH, 0xff8f00).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
-    scene.add.text(startX, barY - 6, "HNG", { fontFamily: "monospace", fontSize: "6px", color: "#888888" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
+    this.hungerBar = scene.add.rectangle(startX, barY, barW, barH, 0xc07830).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+    scene.add.text(startX, barY - 6, "HNG", { fontFamily: "monospace", fontSize: "6px", color: "#706858" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
 
     // Thirst
-    this.thirstBarBg = scene.add.rectangle(startX + barGap, barY, barW, barH, 0x333333).setScrollFactor(0).setDepth(HUD_DEPTH);
-    this.thirstBar = scene.add.rectangle(startX + barGap, barY, barW, barH, 0x29b6f6).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
-    scene.add.text(startX + barGap, barY - 6, "THR", { fontFamily: "monospace", fontSize: "6px", color: "#888888" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
+    this.thirstBarBg = scene.add.rectangle(startX + barGap, barY, barW, barH, 0x2a2a22).setScrollFactor(0).setDepth(HUD_DEPTH);
+    this.thirstBar = scene.add.rectangle(startX + barGap, barY, barW, barH, 0x5090b0).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+    scene.add.text(startX + barGap, barY - 6, "THR", { fontFamily: "monospace", fontSize: "6px", color: "#706858" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
 
     // Stamina
-    this.staminaBarBg = scene.add.rectangle(startX + barGap * 2, barY, barW, barH, 0x333333).setScrollFactor(0).setDepth(HUD_DEPTH);
-    this.staminaBar = scene.add.rectangle(startX + barGap * 2, barY, barW, barH, 0xffee58).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
-    scene.add.text(startX + barGap * 2, barY - 6, "STA", { fontFamily: "monospace", fontSize: "6px", color: "#888888" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
+    this.staminaBarBg = scene.add.rectangle(startX + barGap * 2, barY, barW, barH, 0x2a2a22).setScrollFactor(0).setDepth(HUD_DEPTH);
+    this.staminaBar = scene.add.rectangle(startX + barGap * 2, barY, barW, barH, 0xa0a060).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+    scene.add.text(startX + barGap * 2, barY - 6, "STA", { fontFamily: "monospace", fontSize: "6px", color: "#706858" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
 
     // Radiation
-    this.radBarBg = scene.add.rectangle(startX + barGap * 3, barY, barW, barH, 0x333333).setScrollFactor(0).setDepth(HUD_DEPTH);
-    this.radBar = scene.add.rectangle(startX + barGap * 3, barY, barW, barH, 0x76ff03).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
-    scene.add.text(startX + barGap * 3, barY - 6, "RAD", { fontFamily: "monospace", fontSize: "6px", color: "#888888" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
+    this.radBarBg = scene.add.rectangle(startX + barGap * 3, barY, barW, barH, 0x2a2a22).setScrollFactor(0).setDepth(HUD_DEPTH);
+    this.radBar = scene.add.rectangle(startX + barGap * 3, barY, barW, barH, 0x608020).setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+    scene.add.text(startX + barGap * 3, barY - 6, "RAD", { fontFamily: "monospace", fontSize: "6px", color: "#706858" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
 
     // Status effect indicators
-    this.bleedIcon = scene.add.text(w / 2 - 30, 34, "BLEED", { fontFamily: "monospace", fontSize: "8px", color: "#ff1744" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH).setVisible(false);
-    this.fractureIcon = scene.add.text(w / 2, 34, "FRACTURE", { fontFamily: "monospace", fontSize: "8px", color: "#ffab00" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH).setVisible(false);
-    this.radIcon = scene.add.text(w / 2 + 35, 34, "IRRADIATED", { fontFamily: "monospace", fontSize: "8px", color: "#76ff03" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH).setVisible(false);
+    this.bleedIcon = scene.add.text(w / 2 - 30, 34, "BLEED", { fontFamily: "monospace", fontSize: "8px", color: "#c04040" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH).setVisible(false);
+    this.fractureIcon = scene.add.text(w / 2, 34, "FRACTURE", { fontFamily: "monospace", fontSize: "8px", color: "#c0a040" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH).setVisible(false);
+    this.radIcon = scene.add.text(w / 2 + 35, 34, "IRRADIATED", { fontFamily: "monospace", fontSize: "8px", color: "#608020" }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH).setVisible(false);
 
     // Weapon & ammo (top-right)
     this.weaponText = scene.add
@@ -104,7 +104,7 @@ export class HUD {
       .text(w / 2, 48, "RELOADING...", {
         ...textStyle,
         fontSize: "14px",
-        color: "#ffab40",
+        color: "#c0a050",
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -116,7 +116,7 @@ export class HUD {
       .text(w / 2, scene.scale.height / 2 - 40, "EXTRACTING...", {
         ...textStyle,
         fontSize: "16px",
-        color: "#00e5ff",
+        color: "#40b0a0",
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -147,7 +147,7 @@ export class HUD {
       .text(w / 2, scene.scale.height / 2 + 50, "", {
         ...textStyle,
         fontSize: "13px",
-        color: "#ffc107",
+        color: "#b08030",
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -178,14 +178,14 @@ export class HUD {
     // Hunger
     const hRatio = stats.hunger / 100;
     this.hungerBar.setSize(barW * hRatio, 4);
-    if (stats.hunger < 20) this.hungerBar.setFillStyle(0xff3d00);
-    else this.hungerBar.setFillStyle(0xff8f00);
+    if (stats.hunger < 20) this.hungerBar.setFillStyle(0xa04020);
+    else this.hungerBar.setFillStyle(0xc07830);
 
     // Thirst
     const tRatio = stats.thirst / 100;
     this.thirstBar.setSize(barW * tRatio, 4);
-    if (stats.thirst < 20) this.thirstBar.setFillStyle(0xff3d00);
-    else this.thirstBar.setFillStyle(0x29b6f6);
+    if (stats.thirst < 20) this.thirstBar.setFillStyle(0xa04020);
+    else this.thirstBar.setFillStyle(0x5090b0);
 
     // Stamina
     const sRatio = stats.stamina / 100;

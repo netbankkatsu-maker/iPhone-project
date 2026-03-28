@@ -26,8 +26,8 @@ export class Minimap {
       .setDepth(HUD_DEPTH + 5);
 
     // Background
-    const bg = scene.add.rectangle(MM_SIZE / 2, MM_SIZE / 2, MM_SIZE, MM_SIZE, 0x111122, 0.7);
-    bg.setStrokeStyle(1, 0x444466);
+    const bg = scene.add.rectangle(MM_SIZE / 2, MM_SIZE / 2, MM_SIZE, MM_SIZE, 0x151a10, 0.75);
+    bg.setStrokeStyle(1, 0x3a3a2a);
     this.container.add(bg);
 
     // Extraction marker
@@ -35,19 +35,19 @@ export class Minimap {
       (extractionX / MAP_W) * MM_SIZE,
       (extractionY / MAP_H) * MM_SIZE,
       3,
-      0x00e5ff
+      0x40b0a0
     );
     this.container.add(extractDot);
 
     // Pre-create enemy dot pool
     for (let i = 0; i < MAX_ENEMY_DOTS; i++) {
-      const dot = scene.add.circle(0, 0, 1.5, 0xff3d00).setVisible(false);
+      const dot = scene.add.circle(0, 0, 1.5, 0xc05030).setVisible(false);
       this.container.add(dot);
       this.enemyDots.push(dot);
     }
 
     // Player dot (on top)
-    this.playerDot = scene.add.circle(0, 0, 2.5, 0x00e676);
+    this.playerDot = scene.add.circle(0, 0, 2.5, 0x7a9e5a);
     this.container.add(this.playerDot);
   }
 
