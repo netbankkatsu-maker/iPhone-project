@@ -25,6 +25,12 @@ import {
   damageEnemy,
 } from "./Enemy";
 import { PlayerStash } from "./BaseScene";
+import {
+  GridInventory,
+  InventoryUI,
+  InvItem,
+  ITEM_DEFS,
+} from "./Inventory";
 
 export class RaidScene extends Phaser.Scene {
   // Player
@@ -33,6 +39,7 @@ export class RaidScene extends Phaser.Scene {
   private playerHP = PLAYER_MAX_HP;
   private playerAlive = true;
   private invincibleUntil = 0;
+  private armorValue = 0;
 
   // Weapons
   private currentWeapon: WeaponType = "pistol";
@@ -64,11 +71,17 @@ export class RaidScene extends Phaser.Scene {
   // Aim indicator
   private aimIndicator!: Phaser.GameObjects.Line;
 
-  // Loot containers
+  // Loot containers (world objects)
   private lootContainers!: Phaser.GameObjects.Group;
 
   // Weapon pickup visual
   private weaponPickups!: Phaser.GameObjects.Group;
+
+  // Inventory
+  private inventory!: GridInventory;
+  private inventoryUI!: InventoryUI;
+  private invButton!: Phaser.GameObjects.Text;
+  private nearbyLootContainer: Phaser.GameObjects.Rectangle | null = null;
 
   // Stash from base
   private stash: PlayerStash = { kills: 0, totalExtracts: 0, totalDeaths: 0 };
@@ -90,6 +103,8 @@ export class RaidScene extends Phaser.Scene {
     this.extracted = false;
     this.lastShotTime = 0;
     this.invincibleUntil = 0;
+    this.armorValue = 0;
+    this.nearbyLootContainer = null;
   }
 
   create() {
@@ -133,7 +148,7 @@ export class RaidScene extends Phaser.Scene {
     // Spawn enemies
     this.spawnEnemies();
 
-    // Spawn loot containers
+    // Spawn loot containers with real inventories
     this.spawnLoot();
 
     // Spawn weapon pickups
@@ -154,8 +169,7 @@ export class RaidScene extends Phaser.Scene {
       if (!data || data.state === "dead") return;
       const cfg = ENEMY_TYPES[data.type as EnemyType];
       if (cfg.fireRate === 0) {
-        // Melee attack
-        this.takeDamage(cfg.damage * 0.02); // per-frame damage, balanced
+        this.takeDamage(cfg.damage * 0.02);
       }
     });
 
@@ -170,8 +184,78 @@ export class RaidScene extends Phaser.Scene {
     this.hud.updateWeapon(this.currentWeapon);
     this.hud.updateAmmo(this.ammo, WEAPONS[this.currentWeapon].magSize);
 
+    // Inventory system
+    this.inventory = new GridInventory(8, 5);
+    // Start with pistol and some ammo
+    this.inventory.autoAdd("pistol", 1);
+    this.inventory.autoAdd("ammo_pistol", 24);
+    this.inventory.autoAdd("bandage", 2);
+
+    this.inventoryUI = new InventoryUI(this, this.inventory);
+    this.inventoryUI.onEquip((slot, item) => {
+      this.handleEquipChange(slot, item);
+    });
+    // Equip starting pistol
+    const startPistol = this.inventory.hasItem("pistol");
+    if (startPistol) {
+      this.inventory.removeItem(startPistol);
+      this.inventoryUI.equipItem("weapon1", startPistol);
+    }
+
+    // Inventory button (top-center-left)
+    this.invButton = this.add
+      .text(10, 24, "[BAG]", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#aaaacc",
+        backgroundColor: "#333355",
+        padding: { x: 6, y: 3 },
+      })
+      .setScrollFactor(0)
+      .setDepth(100)
+      .setInteractive();
+    this.invButton.on("pointerdown", () => {
+      if (this.inventoryUI.getIsOpen()) {
+        this.inventoryUI.close();
+      } else {
+        // Check if near loot container
+        const lootInv = this.nearbyLootContainer
+          ? (this.nearbyLootContainer.getData("lootInventory") as GridInventory)
+          : undefined;
+        this.inventoryUI.open(lootInv);
+      }
+    });
+
     // Resize handler
     this.scale.on("resize", this.onResize, this);
+  }
+
+  private handleEquipChange(slot: string, item: InvItem | null) {
+    if (slot === "use_medical" && item) {
+      const def = ITEM_DEFS[item.defId];
+      if (def.healAmount) {
+        this.playerHP = Math.min(PLAYER_MAX_HP, this.playerHP + def.healAmount);
+        this.hud.updateHP(this.playerHP);
+      }
+      return;
+    }
+
+    if (slot === "armor") {
+      this.armorValue = item ? (ITEM_DEFS[item.defId].armorValue || 0) : 0;
+      return;
+    }
+
+    if ((slot === "weapon1" || slot === "weapon2") && item) {
+      const def = ITEM_DEFS[item.defId];
+      if (def.weaponType) {
+        this.currentWeapon = def.weaponType;
+        this.ammo = WEAPONS[def.weaponType].magSize;
+        this.isReloading = false;
+        this.hud.showReloading(false);
+        this.hud.updateWeapon(def.weaponType);
+        this.hud.updateAmmo(this.ammo, WEAPONS[def.weaponType].magSize);
+      }
+    }
   }
 
   private spawnEnemies() {
@@ -180,25 +264,45 @@ export class RaidScene extends Phaser.Scene {
       const type = types[Phaser.Math.Between(0, types.length - 1)];
       spawnEnemy(this, pt.x, pt.y, type, this.enemies, this.mapData.walls);
     }
-
-    // Enemy-enemy collisions
     this.physics.add.collider(this.enemies, this.enemies);
   }
 
   private spawnLoot() {
     for (const pt of this.mapData.lootPoints) {
-      const box = this.add.rectangle(pt.x, pt.y, 16, 16, COLORS.lootContainer);
-      box.setStrokeStyle(1, 0xffab00);
+      const box = this.add.rectangle(pt.x, pt.y, 20, 20, COLORS.lootContainer);
+      box.setStrokeStyle(2, 0xffab00);
       this.physics.add.existing(box, true);
-      box.setData("lootType", Math.random() > 0.5 ? "ammo" : "health");
+
+      // Each loot container has its own grid inventory
+      const lootInv = new GridInventory(4, 3);
+      // Random loot fills
+      const lootTable = ["ammo_pistol", "ammo_rifle", "ammo_shotgun", "bandage", "medkit", "painkiller", "canned_food", "water", "scrap_metal"];
+      const numItems = Phaser.Math.Between(1, 4);
+      for (let i = 0; i < numItems; i++) {
+        const itemId = lootTable[Phaser.Math.Between(0, lootTable.length - 1)];
+        const def = ITEM_DEFS[itemId];
+        const qty = def.stackable ? Phaser.Math.Between(1, Math.ceil(def.maxStack / 3)) : 1;
+        lootInv.autoAdd(itemId, qty);
+      }
+      // Rare chance for weapon
+      if (Math.random() < 0.15) {
+        const weapons = ["smg", "shotgun", "rifle"];
+        lootInv.autoAdd(weapons[Phaser.Math.Between(0, 2)], 1);
+      }
+      // Rare chance for armor
+      if (Math.random() < 0.1) {
+        lootInv.autoAdd(Math.random() > 0.5 ? "armor_light" : "armor_heavy", 1);
+      }
+
+      box.setData("lootInventory", lootInv);
       this.lootContainers.add(box);
     }
   }
 
   private spawnWeaponPickups() {
+    // Weapon pickups are now inside loot containers, but keep a few on the ground
     const weaponTypes: WeaponType[] = ["smg", "shotgun", "rifle"];
-    // Place weapons around map
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const type = weaponTypes[Phaser.Math.Between(0, weaponTypes.length - 1)];
       const x = Phaser.Math.Between(200, MAP_W - 200);
       const y = Phaser.Math.Between(200, MAP_H - 200);
@@ -208,7 +312,6 @@ export class RaidScene extends Phaser.Scene {
       pickup.setData("weaponType", type);
       this.weaponPickups.add(pickup);
 
-      // Label
       this.add
         .text(x, y - 14, WEAPONS[type].name, {
           fontFamily: "monospace",
@@ -229,6 +332,12 @@ export class RaidScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     if (this.extracted) return;
+
+    // Pause gameplay when inventory is open
+    if (this.inventoryUI.getIsOpen()) {
+      this.playerBody.setVelocity(0, 0);
+      return;
+    }
 
     if (!this.playerAlive) {
       this.playerBody.setVelocity(0, 0);
@@ -266,7 +375,7 @@ export class RaidScene extends Phaser.Scene {
       }
     }
 
-    // Auto reload when empty and not shooting
+    // Auto reload when empty
     if (this.ammo <= 0 && !this.isReloading) {
       this.reload();
     }
@@ -296,10 +405,10 @@ export class RaidScene extends Phaser.Scene {
       );
     }
 
-    // Check loot pickup proximity
-    this.checkLootPickup();
+    // Check loot proximity
+    this.checkLootProximity();
 
-    // Check weapon pickup proximity
+    // Check weapon pickup
     this.checkWeaponPickup();
 
     // Extraction check
@@ -332,18 +441,19 @@ export class RaidScene extends Phaser.Scene {
       bullet.setData("meta", { born: this.time.now, damage: weapon.damage });
       this.bullets.add(bullet);
 
-      // Bullet-wall collision
       this.physics.add.collider(bullet, this.mapData.walls, () =>
         bullet.destroy()
       );
 
-      // Bullet-enemy collision
       this.physics.add.overlap(bullet, this.enemies, (b, enemy) => {
         const meta = (b as Phaser.GameObjects.Arc).getData("meta") as {
           damage: number;
         };
         const killed = damageEnemy(this, enemy as EnemySprite, meta.damage);
-        if (killed) this.kills++;
+        if (killed) {
+          this.kills++;
+          this.dropEnemyLoot(enemy as EnemySprite);
+        }
         (b as Phaser.GameObjects.Arc).destroy();
       });
     }
@@ -351,10 +461,31 @@ export class RaidScene extends Phaser.Scene {
     this.ammo--;
     this.hud.updateAmmo(this.ammo, weapon.magSize);
 
-    // Screen shake on shotgun
     if (this.currentWeapon === "shotgun") {
       this.cameras.main.shake(80, 0.003);
     }
+  }
+
+  private dropEnemyLoot(enemy: EnemySprite) {
+    // Create a small loot container at enemy death position
+    const box = this.add.rectangle(enemy.x, enemy.y, 16, 14, 0xef6c00);
+    box.setStrokeStyle(1, 0xffcc80);
+    this.physics.add.existing(box, true);
+
+    const lootInv = new GridInventory(3, 2);
+    const data = enemy.getData("enemyData");
+    const cfg = ENEMY_TYPES[data.type as EnemyType];
+    for (const lootId of cfg.loot) {
+      // Map generic loot names to item IDs
+      const mapped = mapLootId(lootId);
+      if (mapped) {
+        const def = ITEM_DEFS[mapped];
+        const qty = def.stackable ? Phaser.Math.Between(1, Math.ceil(def.maxStack / 4)) : 1;
+        lootInv.autoAdd(mapped, qty);
+      }
+    }
+    box.setData("lootInventory", lootInv);
+    this.lootContainers.add(box);
   }
 
   private reload() {
@@ -383,16 +514,16 @@ export class RaidScene extends Phaser.Scene {
   private takeDamage(amount: number) {
     if (this.time.now < this.invincibleUntil) return;
 
-    this.playerHP -= amount;
+    // Armor reduces damage
+    const reduced = Math.max(1, amount - this.armorValue * 0.3);
+    this.playerHP -= reduced;
     this.hud.updateHP(this.playerHP);
 
-    // Flash
     this.player.setFillStyle(COLORS.playerHurt);
     this.time.delayedCall(100, () => {
       if (this.playerAlive) this.player.setFillStyle(COLORS.playerAlive);
     });
 
-    // Screen flash
     this.cameras.main.flash(100, 255, 0, 0, false, undefined, this);
 
     if (this.playerHP <= 0) {
@@ -418,8 +549,10 @@ export class RaidScene extends Phaser.Scene {
     });
   }
 
-  private checkLootPickup() {
+  private checkLootProximity() {
+    this.nearbyLootContainer = null;
     let nearLoot = false;
+
     for (const obj of this.lootContainers.getChildren()) {
       const box = obj as Phaser.GameObjects.Rectangle;
       const dist = Phaser.Math.Distance.Between(
@@ -428,24 +561,11 @@ export class RaidScene extends Phaser.Scene {
         box.x,
         box.y
       );
-      if (dist < 30) {
+      if (dist < 35) {
         nearLoot = true;
-        this.hud.showInteractHint("Walk over to pick up");
-
-        if (dist < 18) {
-          const lootType = box.getData("lootType") as string;
-          if (lootType === "health") {
-            this.playerHP = Math.min(PLAYER_MAX_HP, this.playerHP + 25);
-            this.hud.updateHP(this.playerHP);
-          } else {
-            this.ammo = Math.min(
-              WEAPONS[this.currentWeapon].magSize,
-              this.ammo + Math.ceil(WEAPONS[this.currentWeapon].magSize / 2)
-            );
-            this.hud.updateAmmo(this.ammo, WEAPONS[this.currentWeapon].magSize);
-          }
-          box.destroy();
-        }
+        this.nearbyLootContainer = box;
+        this.hud.showInteractHint("Tap [BAG] to loot");
+        break;
       }
     }
     if (!nearLoot) this.hud.hideInteractHint();
@@ -461,14 +581,11 @@ export class RaidScene extends Phaser.Scene {
         pickup.y
       );
       if (dist < 20) {
-        const newWeapon = pickup.getData("weaponType") as WeaponType;
-        this.currentWeapon = newWeapon;
-        this.ammo = WEAPONS[newWeapon].magSize;
-        this.isReloading = false;
-        this.hud.showReloading(false);
-        this.hud.updateWeapon(newWeapon);
-        this.hud.updateAmmo(this.ammo, WEAPONS[newWeapon].magSize);
-        pickup.destroy();
+        const wType = pickup.getData("weaponType") as WeaponType;
+        // Add to inventory instead of auto-equip
+        if (this.inventory.autoAdd(wType, 1)) {
+          pickup.destroy();
+        }
       }
     }
   }
@@ -518,8 +635,20 @@ export class RaidScene extends Phaser.Scene {
     this.time.delayedCall(3000, () => {
       this.scene.start("BaseScene", {
         stash: this.stash,
-        message: `EXTRACTED - ${this.kills} kills this raid.`,
+        message: `EXTRACTED - ${this.kills} kills, loot secured.`,
       });
     });
   }
+}
+
+function mapLootId(lootId: string): string | null {
+  const map: Record<string, string> = {
+    ammo: "ammo_pistol",
+    bandage: "bandage",
+    medkit: "medkit",
+    meat: "canned_food",
+    mutant_part: "scrap_metal",
+    weapon_part: "scrap_metal",
+  };
+  return map[lootId] || null;
 }
