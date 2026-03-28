@@ -307,7 +307,7 @@ new Phaser.Game(config);
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/iphone-project/sw.js")
+      .register("/iPhone-project/sw.js")
       .catch((err) => console.warn("SW registration failed:", err));
   });
 }

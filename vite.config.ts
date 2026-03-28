@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/iphone-project/",
+  base: "/iPhone-project/",
   build: {
     outDir: "dist",
     assetsInlineLimit: 0,

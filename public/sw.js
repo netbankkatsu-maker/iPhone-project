@@ -2,7 +2,7 @@ const CACHE_NAME = "survival-shooter-v1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(["/iphone-project/"]))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(["/iPhone-project/"]))
   );
   self.skipWaiting();
 });
