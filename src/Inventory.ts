@@ -179,15 +179,14 @@ export class GridInventory {
   }
 }
 
-// ─── Inventory UI (responsive, mobile-friendly) ─────────────
-// Item type color map for visual distinction
+// ─── Inventory UI (large, mobile-friendly) ──────────────────
 const TYPE_COLORS: Record<string, { bg: number; border: number; icon: string }> = {
-  weapon:   { bg: 0x5a4030, border: 0xa07050, icon: "W" },
-  ammo:     { bg: 0x4a4a20, border: 0x908830, icon: "A" },
-  medical:  { bg: 0x304030, border: 0x50a050, icon: "+" },
-  food:     { bg: 0x3a3020, border: 0x907040, icon: "F" },
-  material: { bg: 0x303040, border: 0x606080, icon: "M" },
-  armor:    { bg: 0x2a3540, border: 0x5080a0, icon: "D" },
+  weapon:   { bg: 0x5a4030, border: 0xc09060, icon: "GUN" },
+  ammo:     { bg: 0x4a4a20, border: 0xb0a840, icon: "AMO" },
+  medical:  { bg: 0x2a4a2a, border: 0x60c060, icon: "MED" },
+  food:     { bg: 0x4a3520, border: 0xc09050, icon: "EAT" },
+  material: { bg: 0x303040, border: 0x7070a0, icon: "MAT" },
+  armor:    { bg: 0x2a3540, border: 0x60a0d0, icon: "DEF" },
 };
 
 export class InventoryUI {
@@ -202,9 +201,9 @@ export class InventoryUI {
   private hitZones: { x: number; y: number; w: number; h: number; action: () => void }[] = [];
 
   private equipSlotDefs = [
-    { key: "weapon1", label: "WEAPON 1", w: 4, h: 1 },
-    { key: "weapon2", label: "WEAPON 2", w: 4, h: 1 },
-    { key: "armor",   label: "ARMOR",    w: 2, h: 2 },
+    { key: "weapon1", label: "WPN 1" },
+    { key: "weapon2", label: "WPN 2" },
+    { key: "armor",   label: "ARMOR" },
   ];
 
   constructor(scene: Phaser.Scene, inventory: GridInventory) {
@@ -261,70 +260,50 @@ export class InventoryUI {
 
     const sw = this.scene.scale.width;
     const sh = this.scene.scale.height;
-    const isLandscape = sw > sh;
 
-    // Dynamic cell size based on screen
-    const cellSize = isLandscape
-      ? Math.floor(Math.min((sh - 80) / (this.inventory.rows + (this.lootInventory ? 4 : 0)), (sw * 0.45) / this.inventory.cols))
-      : Math.floor(Math.min((sw - 20) / this.inventory.cols, (sh - 120) / (this.inventory.rows + 6)));
-    const cs = Math.max(28, Math.min(cellSize, 52));
+    // Cell size: fill screen width with inventory columns + padding
+    const pad = 12;
+    const cs = Math.floor((sw - pad * 2) / this.inventory.cols);
 
     // Background
-    this.ui(this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x0e1210, 0.92));
+    this.ui(this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x0e1210, 0.94));
 
     // Header bar
-    this.ui(this.scene.add.rectangle(sw / 2, 18, sw, 36, 0x1a2018, 0.95), HUD_DEPTH + 51);
-    this.ui(this.scene.add.text(sw / 2, 18, "INVENTORY", {
-      fontFamily: "monospace", fontSize: "16px", color: "#7a9e5a", fontStyle: "bold",
-    }).setOrigin(0.5), HUD_DEPTH + 52);
+    const headerH = 42;
+    this.ui(this.scene.add.rectangle(sw / 2, headerH / 2, sw, headerH, 0x1a2018, 0.98), HUD_DEPTH + 51);
+    this.ui(this.scene.add.text(14, headerH / 2, "INVENTORY", {
+      fontFamily: "monospace", fontSize: "20px", color: "#7a9e5a", fontStyle: "bold",
+    }).setOrigin(0, 0.5), HUD_DEPTH + 52);
 
-    // Close button
-    const closeCx = sw - 30;
-    const closeCy = 18;
-    this.ui(this.scene.add.rectangle(closeCx, closeCy, 52, 30, 0x8b3030, 0.8), HUD_DEPTH + 52)
-      .setStrokeStyle(1, 0xc04040);
-    this.ui(this.scene.add.text(closeCx, closeCy, "X", {
-      fontFamily: "monospace", fontSize: "20px", color: "#ffffff", fontStyle: "bold",
+    // Close button (big)
+    const closeCx = sw - 36;
+    const closeCy = headerH / 2;
+    this.ui(this.scene.add.rectangle(closeCx, closeCy, 60, 36, 0x8b3030, 0.9), HUD_DEPTH + 52)
+      .setStrokeStyle(2, 0xc04040);
+    this.ui(this.scene.add.text(closeCx, closeCy, "CLOSE", {
+      fontFamily: "monospace", fontSize: "13px", color: "#ffffff", fontStyle: "bold",
     }).setOrigin(0.5), HUD_DEPTH + 53);
-    this.addHitZone(closeCx, closeCy, 52, 30, () => this.close());
+    this.addHitZone(closeCx, closeCy, 60, 36, () => this.close());
 
-    if (isLandscape) {
-      // ── Landscape: equip left, grid center, loot right ──
-      const equipX = 10;
-      const equipY = 44;
-      this.drawEquipSlots(equipX, equipY, cs);
+    let curY = headerH + 6;
 
-      const invX = equipX + 5 * cs + 14;
-      const invY = 44;
-      this.drawSectionLabel(invX, invY - 2, "BACKPACK");
-      this.drawGrid(invX, invY + 14, this.inventory, "player", cs);
+    // ── Equipment slots (horizontal, full width) ──
+    this.drawSectionLabel(pad, curY, "EQUIPMENT");
+    curY += 18;
+    this.drawEquipRow(pad, curY, cs);
+    curY += cs + 8;
 
-      if (this.lootInventory) {
-        const lootX = invX + this.inventory.cols * cs + 14;
-        this.drawSectionLabel(lootX, invY - 2, "LOOT");
-        this.drawGrid(lootX, invY + 14, this.lootInventory, "loot", cs);
-      }
-    } else {
-      // ── Portrait: equip top, grid middle, loot bottom ──
-      const contentX = Math.max(6, (sw - this.inventory.cols * cs) / 2);
-      let curY = 42;
+    // ── Backpack grid ──
+    this.drawSectionLabel(pad, curY, "BACKPACK");
+    curY += 18;
+    this.drawGrid(pad, curY, this.inventory, "player", cs);
+    curY += this.inventory.rows * cs + 10;
 
-      // Equip slots (horizontal row)
-      this.drawEquipSlotsHorizontal(contentX, curY, cs);
-      curY += 2.5 * cs + 10;
-
-      // Backpack
-      this.drawSectionLabel(contentX, curY, "BACKPACK");
-      curY += 14;
-      this.drawGrid(contentX, curY, this.inventory, "player", cs);
-      curY += this.inventory.rows * cs + 8;
-
-      // Loot
-      if (this.lootInventory) {
-        this.drawSectionLabel(contentX, curY, "LOOT");
-        curY += 14;
-        this.drawGrid(contentX, curY, this.lootInventory, "loot", cs);
-      }
+    // ── Loot grid ──
+    if (this.lootInventory) {
+      this.drawSectionLabel(pad, curY, "LOOT");
+      curY += 18;
+      this.drawGrid(pad, curY, this.lootInventory, "loot", cs);
     }
 
     // Pointer handler
@@ -345,92 +324,73 @@ export class InventoryUI {
   }
 
   private drawSectionLabel(x: number, y: number, text: string) {
+    const line = this.ui(this.scene.add.rectangle(
+      this.scene.scale.width / 2, y + 7, this.scene.scale.width - 20, 1, 0x3a4a30, 0.5
+    ), HUD_DEPTH + 51);
     this.ui(this.scene.add.text(x, y, text, {
-      fontFamily: "monospace", fontSize: "10px", color: "#607050", fontStyle: "bold",
-    }), HUD_DEPTH + 51);
+      fontFamily: "monospace", fontSize: "13px", color: "#7a9e5a", fontStyle: "bold",
+    }), HUD_DEPTH + 52);
   }
 
-  private drawEquipSlots(startX: number, startY: number, cs: number) {
-    this.drawSectionLabel(startX, startY - 2, "EQUIP");
+  /** Draw equipment as a single horizontal row of large slots */
+  private drawEquipRow(startX: number, startY: number, cs: number) {
+    const sw = this.scene.scale.width;
+    const slotGap = 6;
+    const numSlots = this.equipSlotDefs.length;
+    const slotW = Math.floor((sw - startX * 2 - slotGap * (numSlots - 1)) / numSlots);
+    const slotH = cs;
 
-    let slotY = startY + 14;
-    for (const slotDef of this.equipSlotDefs) {
-      const slotW = slotDef.w * cs;
-      const slotH = slotDef.h * cs;
-      const cx = startX + slotW / 2;
-      const cy = slotY + slotH / 2;
-
-      // Slot background
-      this.ui(this.scene.add.rectangle(cx, cy, slotW - 2, slotH - 2, 0x1a2018, 0.9))
-        .setStrokeStyle(1, 0x3a4a30);
-      // Slot label
-      this.ui(this.scene.add.text(startX + 4, slotY + 2, slotDef.label, {
-        fontFamily: "monospace", fontSize: "8px", color: "#4a5a40",
-      }));
-
-      const equipped = this.equippedItems.get(slotDef.key);
-      if (equipped) {
-        this.drawEquippedItem(cx, cy, slotW, slotH, slotDef.key, equipped);
-      }
-      slotY += slotH + 4;
-    }
-  }
-
-  private drawEquipSlotsHorizontal(startX: number, startY: number, cs: number) {
-    this.drawSectionLabel(startX, startY, "EQUIP");
     let sx = startX;
-    const sy = startY + 14;
     for (const slotDef of this.equipSlotDefs) {
-      const slotW = slotDef.w * cs;
-      const slotH = slotDef.h * cs;
       const cx = sx + slotW / 2;
-      const cy = sy + slotH / 2;
+      const cy = startY + slotH / 2;
 
-      this.ui(this.scene.add.rectangle(cx, cy, slotW - 2, slotH - 2, 0x1a2018, 0.9))
+      // Slot bg
+      this.ui(this.scene.add.rectangle(cx, cy, slotW, slotH, 0x1a2018, 0.9))
         .setStrokeStyle(1, 0x3a4a30);
-      this.ui(this.scene.add.text(sx + 3, sy + 2, slotDef.label, {
-        fontFamily: "monospace", fontSize: "7px", color: "#4a5a40",
-      }));
 
       const equipped = this.equippedItems.get(slotDef.key);
       if (equipped) {
-        this.drawEquippedItem(cx, cy, slotW, slotH, slotDef.key, equipped);
+        const def = ITEM_DEFS[equipped.defId];
+        const tc = TYPE_COLORS[def.type] || TYPE_COLORS.material;
+        this.ui(this.scene.add.rectangle(cx, cy, slotW - 4, slotH - 4, tc.bg, 0.9), HUD_DEPTH + 51)
+          .setStrokeStyle(2, tc.border);
+        this.ui(this.scene.add.text(cx, cy, def.name, {
+          fontFamily: "monospace", fontSize: "13px", color: "#e8e0d0", fontStyle: "bold",
+        }).setOrigin(0.5), HUD_DEPTH + 52);
+
+        const capturedKey = slotDef.key;
+        const capturedItem = equipped;
+        this.addHitZone(cx, cy, slotW, slotH, () => {
+          this.equippedItems.delete(capturedKey);
+          this.inventory.autoAdd(capturedItem.defId, capturedItem.quantity);
+          if (this.onEquipCallback) this.onEquipCallback(capturedKey, null);
+          this.rebuild();
+        });
+      } else {
+        // Empty label
+        this.ui(this.scene.add.text(cx, cy, slotDef.label, {
+          fontFamily: "monospace", fontSize: "11px", color: "#3a4a30",
+        }).setOrigin(0.5));
       }
-      sx += slotW + 6;
+      sx += slotW + slotGap;
     }
-  }
-
-  private drawEquippedItem(cx: number, cy: number, w: number, h: number, key: string, item: InvItem) {
-    const def = ITEM_DEFS[item.defId];
-    const tc = TYPE_COLORS[def.type] || TYPE_COLORS.material;
-    this.ui(this.scene.add.rectangle(cx, cy, w - 6, h - 6, tc.bg, 0.9), HUD_DEPTH + 51)
-      .setStrokeStyle(2, tc.border);
-    this.ui(this.scene.add.text(cx, cy, def.name, {
-      fontFamily: "monospace", fontSize: "10px", color: "#e0d8c8", fontStyle: "bold",
-    }).setOrigin(0.5), HUD_DEPTH + 51);
-
-    const capturedKey = key;
-    const capturedItem = item;
-    this.addHitZone(cx, cy, w, h, () => {
-      this.equippedItems.delete(capturedKey);
-      this.inventory.autoAdd(capturedItem.defId, capturedItem.quantity);
-      if (this.onEquipCallback) this.onEquipCallback(capturedKey, null);
-      this.rebuild();
-    });
   }
 
   private drawGrid(startX: number, startY: number, inv: GridInventory, source: "player" | "loot", cs: number) {
-    // Grid background
     const gridW = inv.cols * cs;
     const gridH = inv.rows * cs;
-    this.ui(this.scene.add.rectangle(startX + gridW / 2, startY + gridH / 2, gridW + 2, gridH + 2, 0x0a0f0a, 0.5));
+
+    // Grid outer bg
+    this.ui(this.scene.add.rectangle(startX + gridW / 2, startY + gridH / 2, gridW + 4, gridH + 4, 0x0a0f0a, 0.6))
+      .setStrokeStyle(1, 0x2a3628);
 
     // Cells
     for (let gy = 0; gy < inv.rows; gy++) {
       for (let gx = 0; gx < inv.cols; gx++) {
         const cx = startX + gx * cs + cs / 2;
         const cy = startY + gy * cs + cs / 2;
-        this.ui(this.scene.add.rectangle(cx, cy, cs - 2, cs - 2, 0x161e14, 0.9))
+        this.ui(this.scene.add.rectangle(cx, cy, cs - 3, cs - 3, 0x161e14, 0.9))
           .setStrokeStyle(1, 0x2a3628);
       }
     }
@@ -453,29 +413,27 @@ export class InventoryUI {
       const tc = TYPE_COLORS[def.type] || TYPE_COLORS.material;
 
       // Item background
-      this.ui(this.scene.add.rectangle(cx, cy, iw - 4, ih - 4, tc.bg, 0.85), HUD_DEPTH + 51)
+      this.ui(this.scene.add.rectangle(cx, cy, iw - 5, ih - 5, tc.bg, 0.9), HUD_DEPTH + 51)
         .setStrokeStyle(2, tc.border);
 
-      // Type icon (top-left corner)
-      this.ui(this.scene.add.text(ix + 4, iy + 2, tc.icon, {
-        fontFamily: "monospace", fontSize: "9px", color: "#ffffff",
+      // Type tag (top-left)
+      this.ui(this.scene.add.text(ix + 5, iy + 3, tc.icon, {
+        fontFamily: "monospace", fontSize: "10px", color: "#ffffff",
         backgroundColor: `#${tc.border.toString(16).padStart(6, "0")}`,
-        padding: { x: 2, y: 0 },
+        padding: { x: 3, y: 1 },
       }), HUD_DEPTH + 52);
 
-      // Item name (center, larger font)
-      const fontSize = iw > cs * 1.5 ? "10px" : "9px";
-      this.ui(this.scene.add.text(cx, cy - (def.stackable && item.quantity > 1 ? 4 : 0), def.name, {
-        fontFamily: "monospace", fontSize, color: "#e0d8c8", fontStyle: "bold",
+      // Item name (center, BIG)
+      const hasQty = def.stackable && item.quantity > 1;
+      this.ui(this.scene.add.text(cx, cy - (hasQty ? 7 : 0), def.name, {
+        fontFamily: "monospace", fontSize: "14px", color: "#f0e8d8", fontStyle: "bold",
       }).setOrigin(0.5), HUD_DEPTH + 52);
 
-      // Quantity badge (bottom-right)
-      if (def.stackable && item.quantity > 1) {
-        this.ui(this.scene.add.text(ix + iw - 6, iy + ih - 6, `${item.quantity}`, {
-          fontFamily: "monospace", fontSize: "10px", color: "#d4a840", fontStyle: "bold",
-          backgroundColor: "#00000088",
-          padding: { x: 2, y: 0 },
-        }).setOrigin(1, 1), HUD_DEPTH + 52);
+      // Quantity (below name, big)
+      if (hasQty) {
+        this.ui(this.scene.add.text(cx, cy + 10, `x${item.quantity}`, {
+          fontFamily: "monospace", fontSize: "14px", color: "#d4a840", fontStyle: "bold",
+        }).setOrigin(0.5), HUD_DEPTH + 52);
       }
 
       // Hit zone
