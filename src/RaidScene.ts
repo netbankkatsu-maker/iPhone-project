@@ -44,10 +44,11 @@ import { FogOfWar } from "./FogOfWar";
 import { Minimap } from "./Minimap";
 import { AudioManager } from "./Audio";
 import { updateQuestProgress } from "./Quest";
+import { generateTextures } from "./Textures";
 
 export class RaidScene extends Phaser.Scene {
   // Player
-  private player!: Phaser.GameObjects.Arc;
+  private player!: Phaser.GameObjects.Sprite;
   private playerBody!: Phaser.Physics.Arcade.Body;
   private playerHP = PLAYER_MAX_HP;
   private playerAlive = true;
@@ -142,6 +143,9 @@ export class RaidScene extends Phaser.Scene {
   create() {
     this.physics.world.setBounds(0, 0, MAP_W, MAP_H);
 
+    // Generate procedural textures
+    generateTextures(this);
+
     // Generate map
     this.mapData = generateMap(this);
 
@@ -152,16 +156,15 @@ export class RaidScene extends Phaser.Scene {
     this.lootContainers = this.add.group();
     this.weaponPickups = this.add.group();
 
-    // Player
-    this.player = this.add.circle(
+    // Player (sprite with generated texture)
+    this.player = this.add.sprite(
       this.mapData.spawnPoint.x,
       this.mapData.spawnPoint.y,
-      PLAYER_RADIUS,
-      COLORS.playerAlive
+      "player_alive"
     );
     this.physics.add.existing(this.player);
     this.playerBody = this.player.body as Phaser.Physics.Arcade.Body;
-    this.playerBody.setCircle(PLAYER_RADIUS);
+    this.playerBody.setCircle(PLAYER_RADIUS, 2, 2);
     this.playerBody.setCollideWorldBounds(true);
 
     // Aim indicator
@@ -172,7 +175,7 @@ export class RaidScene extends Phaser.Scene {
 
     // Camera
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setBackgroundColor("#1a1a2e");
+    this.cameras.main.setBackgroundColor("#1a1f14");
 
     // Fog of War
     this.fog = new FogOfWar(this);
@@ -197,12 +200,12 @@ export class RaidScene extends Phaser.Scene {
 
     // Group-level colliders (instead of per-bullet)
     this.physics.add.collider(this.bullets, this.mapData.walls, (bullet) => {
-      (bullet as Phaser.GameObjects.Arc).destroy();
+      (bullet as Phaser.GameObjects.Sprite).destroy();
     });
     this.physics.add.overlap(this.bullets, this.enemies, (bullet, enemy) => {
-      if (!(bullet as Phaser.GameObjects.Arc).active) return;
-      if (!(enemy as Phaser.GameObjects.Arc).active) return;
-      const meta = (bullet as Phaser.GameObjects.Arc).getData("meta") as { damage: number };
+      if (!(bullet as Phaser.GameObjects.Sprite).active) return;
+      if (!(enemy as Phaser.GameObjects.Sprite).active) return;
+      const meta = (bullet as Phaser.GameObjects.Sprite).getData("meta") as { damage: number };
       if (!meta) return;
 
       // Capture enemy data BEFORE damageEnemy destroys it
@@ -218,19 +221,19 @@ export class RaidScene extends Phaser.Scene {
         this.dropEnemyLootAt(ex, ey, enemyData);
         this.showKillFeedFor(enemyData);
       }
-      (bullet as Phaser.GameObjects.Arc).destroy();
+      (bullet as Phaser.GameObjects.Sprite).destroy();
     });
 
     // Enemy bullets hit player
     this.physics.add.collider(this.enemyBullets, this.mapData.walls, (bullet) => {
-      (bullet as Phaser.GameObjects.Arc).destroy();
+      (bullet as Phaser.GameObjects.Sprite).destroy();
     });
     this.physics.add.overlap(
       this.player,
       this.enemyBullets,
       (_player, bullet) => {
-        if (!(bullet as Phaser.GameObjects.Arc).active) return;
-        this.onPlayerHit(bullet as Phaser.GameObjects.Arc);
+        if (!(bullet as Phaser.GameObjects.Sprite).active) return;
+        this.onPlayerHit(bullet as Phaser.GameObjects.Sprite);
       }
     );
 
@@ -386,8 +389,7 @@ export class RaidScene extends Phaser.Scene {
 
   private spawnLoot() {
     for (const pt of this.mapData.lootPoints) {
-      const box = this.add.rectangle(pt.x, pt.y, 20, 20, COLORS.lootContainer);
-      box.setStrokeStyle(2, 0xffab00);
+      const box = this.add.sprite(pt.x, pt.y, "crate_loot");
       this.physics.add.existing(box, true);
 
       // Each loot container has its own grid inventory
@@ -423,8 +425,10 @@ export class RaidScene extends Phaser.Scene {
       const type = weaponTypes[Phaser.Math.Between(0, weaponTypes.length - 1)];
       const x = Phaser.Math.Between(200, MAP_W - 200);
       const y = Phaser.Math.Between(200, MAP_H - 200);
-      const pickup = this.add.circle(x, y, 8, WEAPONS[type].color, 0.8);
-      pickup.setStrokeStyle(2, 0xffffff, 0.5);
+      const gunTexKey = `gun_${type}`;
+      const pickup = this.textures.exists(gunTexKey)
+        ? this.add.sprite(x, y, gunTexKey)
+        : this.add.circle(x, y, 8, WEAPONS[type].color, 0.8);
       this.physics.add.existing(pickup, true);
       pickup.setData("weaponType", type);
       this.weaponPickups.add(pickup);
@@ -432,8 +436,10 @@ export class RaidScene extends Phaser.Scene {
       this.add
         .text(x, y - 14, WEAPONS[type].name, {
           fontFamily: "monospace",
-          fontSize: "8px",
-          color: "#cccccc",
+          fontSize: "9px",
+          color: "#e0d8c8",
+          backgroundColor: "#00000066",
+          padding: { x: 2, y: 1 },
         })
         .setOrigin(0.5);
     }
@@ -473,9 +479,13 @@ export class RaidScene extends Phaser.Scene {
     const ay = this.aimStick.vector.y;
     if (ax !== 0 || ay !== 0) {
       const angle = Math.atan2(ay, ax);
+      this.player.setRotation(angle - Math.PI / 2);
       this.aimIndicator.setVisible(true);
       this.aimIndicator.setPosition(this.player.x, this.player.y);
       this.aimIndicator.setRotation(angle);
+    } else if (mx !== 0 || my !== 0) {
+      this.player.setRotation(Math.atan2(my, mx) - Math.PI / 2);
+      this.aimIndicator.setVisible(false);
     } else {
       this.aimIndicator.setVisible(false);
     }
@@ -502,12 +512,12 @@ export class RaidScene extends Phaser.Scene {
     // Update bullets lifetime
     for (const b of [...this.bullets.getChildren()]) {
       if (!b.active) continue;
-      const meta = (b as Phaser.GameObjects.Arc).getData("meta") as { born: number } | null;
+      const meta = (b as Phaser.GameObjects.Sprite).getData("meta") as { born: number } | null;
       if (!meta || this.time.now - meta.born > BULLET_LIFETIME) b.destroy();
     }
     for (const b of [...this.enemyBullets.getChildren()]) {
       if (!b.active) continue;
-      const meta = (b as Phaser.GameObjects.Arc).getData("meta") as { born: number } | null;
+      const meta = (b as Phaser.GameObjects.Sprite).getData("meta") as { born: number } | null;
       if (!meta || this.time.now - meta.born > BULLET_LIFETIME) b.destroy();
     }
 
@@ -578,10 +588,10 @@ export class RaidScene extends Phaser.Scene {
       const bx = this.player.x + Math.cos(angle) * 20;
       const by = this.player.y + Math.sin(angle) * 20;
 
-      const bullet = this.add.circle(bx, by, BULLET_RADIUS, weapon.color);
+      const bullet = this.add.sprite(bx, by, "bullet_player").setRotation(angle);
       this.physics.add.existing(bullet);
       const body = bullet.body as Phaser.Physics.Arcade.Body;
-      body.setCircle(BULLET_RADIUS);
+      body.setSize(6, 4);
       body.setVelocity(
         Math.cos(angle) * weapon.bulletSpeed,
         Math.sin(angle) * weapon.bulletSpeed
@@ -604,8 +614,7 @@ export class RaidScene extends Phaser.Scene {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private dropEnemyLootAt(x: number, y: number, data: any) {
-    const box = this.add.rectangle(x, y, 16, 14, 0xef6c00);
-    box.setStrokeStyle(1, 0xffcc80);
+    const box = this.add.sprite(x, y, "crate_drop");
     this.physics.add.existing(box, true);
 
     const lootInv = new GridInventory(3, 2);
@@ -645,7 +654,7 @@ export class RaidScene extends Phaser.Scene {
     });
   }
 
-  private onPlayerHit(bullet: Phaser.GameObjects.Arc) {
+  private onPlayerHit(bullet: Phaser.GameObjects.Sprite) {
     if (!this.playerAlive || !bullet.active) return;
     const meta = bullet.getData("meta") as { damage: number } | null;
     bullet.destroy();
@@ -664,9 +673,9 @@ export class RaidScene extends Phaser.Scene {
     onDamageTaken(this.survival, reduced);
 
     this.audio.playDamage();
-    this.player.setFillStyle(COLORS.playerHurt);
+    this.player.setTexture("player_hurt");
     this.time.delayedCall(100, () => {
-      if (this.playerAlive) this.player.setFillStyle(COLORS.playerAlive);
+      if (this.playerAlive) this.player.setTexture("player_alive");
     });
 
     this.cameras.main.flash(100, 255, 0, 0, false, undefined, this);
@@ -683,7 +692,7 @@ export class RaidScene extends Phaser.Scene {
     this.playerAlive = false;
     this.playerBody.setVelocity(0, 0);
     this.playerBody.setImmovable(true);
-    this.player.setFillStyle(0x555555);
+    this.player.setTexture("player_dead");
     this.player.setAlpha(0.5);
     this.hud.showStatus("YOU DIED\n\nAll loot lost.", "#ff5252");
 
@@ -722,7 +731,7 @@ export class RaidScene extends Phaser.Scene {
 
   private checkWeaponPickup() {
     for (const obj of this.weaponPickups.getChildren()) {
-      const pickup = obj as Phaser.GameObjects.Arc;
+      const pickup = obj as Phaser.GameObjects.Sprite;
       const dist = Phaser.Math.Distance.Between(
         this.player.x,
         this.player.y,
