@@ -8,6 +8,22 @@ interface RoomDef {
   h: number;
 }
 
+export interface DoorDef {
+  x: number;
+  y: number;
+  isOpen: boolean;
+  horizontal: boolean;
+  visual: Phaser.GameObjects.Rectangle;
+}
+
+export interface HazardDef {
+  x: number;
+  y: number;
+  type: "landmine" | "toxic_gas";
+  radius: number;
+  gameObject: Phaser.GameObjects.Arc;
+}
+
 export interface MapData {
   walls: Phaser.Physics.Arcade.StaticGroup;
   spawnPoint: Phaser.Math.Vector2;
@@ -15,6 +31,8 @@ export interface MapData {
   extractionZone: Phaser.GameObjects.Arc;
   enemySpawnPoints: Phaser.Math.Vector2[];
   lootPoints: Phaser.Math.Vector2[];
+  hazards: HazardDef[];
+  doors: DoorDef[];
 }
 
 export function generateMap(scene: Phaser.Scene): MapData {
@@ -130,6 +148,56 @@ export function generateMap(scene: Phaser.Scene): MapData {
       )
   );
 
+  // Hazards (landmines & toxic gas)
+  const hazards: HazardDef[] = [];
+  for (let i = 0; i < 8; i++) {
+    const hx = Phaser.Math.Between(200, MAP_W - 200);
+    const hy = Phaser.Math.Between(200, MAP_H - 200);
+    // Don't place near spawn
+    if (Phaser.Math.Distance.Between(hx, hy, spawnPoint.x, spawnPoint.y) < 300) continue;
+
+    const type = Math.random() > 0.5 ? "landmine" as const : "toxic_gas" as const;
+    const radius = type === "landmine" ? 8 : Phaser.Math.Between(40, 70);
+
+    let go: Phaser.GameObjects.Arc;
+    if (type === "landmine") {
+      go = scene.add.circle(hx, hy, radius, 0xff1744, 0.4);
+      go.setStrokeStyle(1, 0xff1744, 0.6);
+    } else {
+      go = scene.add.circle(hx, hy, radius, 0x69f0ae, 0.06);
+      go.setStrokeStyle(1, 0x69f0ae, 0.2);
+      scene.tweens.add({
+        targets: go,
+        alpha: { from: 0.04, to: 0.12 },
+        duration: 2000,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+    hazards.push({ x: hx, y: hy, type, radius, gameObject: go });
+  }
+
+  // Doors (interactable)
+  const doors: DoorDef[] = [];
+  for (const room of rooms) {
+    const doorSide = Phaser.Math.Between(0, 3);
+    let dx: number, dy: number;
+    const isHorizontal = doorSide === 0 || doorSide === 1;
+    if (doorSide === 0) { dx = room.x; dy = room.y - room.h / 2; }
+    else if (doorSide === 1) { dx = room.x; dy = room.y + room.h / 2; }
+    else if (doorSide === 2) { dx = room.x - room.w / 2; dy = room.y; }
+    else { dx = room.x + room.w / 2; dy = room.y; }
+
+    const doorVis = scene.add.rectangle(
+      dx, dy,
+      isHorizontal ? 36 : 12,
+      isHorizontal ? 12 : 36,
+      0x8d6e63, 0.7
+    ).setDepth(5);
+
+    doors.push({ x: dx, y: dy, isOpen: true, horizontal: isHorizontal, visual: doorVis });
+  }
+
   return {
     walls,
     spawnPoint,
@@ -137,6 +205,8 @@ export function generateMap(scene: Phaser.Scene): MapData {
     extractionZone,
     enemySpawnPoints,
     lootPoints,
+    hazards,
+    doors,
   };
 }
 
