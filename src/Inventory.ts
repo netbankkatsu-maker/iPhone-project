@@ -191,6 +191,8 @@ export class InventoryUI {
   private isOpen = false;
   private onEquipCallback: ((slot: string, item: InvItem | null) => void) | null = null;
   private equippedItems: Map<string, InvItem> = new Map();
+  private pointerHandler: ((pointer: Phaser.Input.Pointer) => void) | null = null;
+  private hitZones: { x: number; y: number; w: number; h: number; action: () => void }[] = [];
 
   // Equipment slots layout
   private equipSlotDefs = [
@@ -224,19 +226,33 @@ export class InventoryUI {
 
   close() {
     this.isOpen = false;
+    this.removePointerHandler();
     for (const obj of this.uiObjects) {
       if (obj && obj.active) obj.destroy();
     }
     this.uiObjects = [];
+    this.hitZones = [];
   }
 
   getIsOpen() { return this.isOpen; }
 
-  /** Helper: add a game object to the scene, set scrollFactor(0), track for cleanup */
-  private ui<T extends Phaser.GameObjects.GameObject & { setScrollFactor: (x: number, y?: number) => T; setDepth: (d: number) => T }>(obj: T): T {
-    obj.setScrollFactor(0).setDepth(HUD_DEPTH + 50);
+  private removePointerHandler() {
+    if (this.pointerHandler) {
+      this.scene.input.off("pointerdown", this.pointerHandler);
+      this.pointerHandler = null;
+    }
+  }
+
+  /** Helper: add a visual-only UI object (scrollFactor 0, no Phaser interactivity) */
+  private ui<T extends Phaser.GameObjects.GameObject & { setScrollFactor: (x: number, y?: number) => T; setDepth: (d: number) => T }>(obj: T, depth = HUD_DEPTH + 50): T {
+    obj.setScrollFactor(0).setDepth(depth);
     this.uiObjects.push(obj);
     return obj;
+  }
+
+  /** Register a screen-coordinate tap zone (center x, center y, width, height) */
+  private addHitZone(cx: number, cy: number, w: number, h: number, action: () => void) {
+    this.hitZones.push({ x: cx - w / 2, y: cy - h / 2, w, h, action });
   }
 
   private rebuild() {
@@ -245,21 +261,20 @@ export class InventoryUI {
       if (obj && obj.active) obj.destroy();
     }
     this.uiObjects = [];
+    this.hitZones = [];
+    this.removePointerHandler();
 
     const sw = this.scene.scale.width;
     const sh = this.scene.scale.height;
 
-    // Background - tap to close
-    const bg = this.ui(this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x000000, 0.85));
-    bg.setInteractive();
-    bg.on("pointerdown", () => this.close());
+    // Background (visual only)
+    this.ui(this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x000000, 0.85));
 
     // Title
     this.ui(this.scene.add.text(sw / 2, 12, "INVENTORY", {
       fontFamily: "monospace", fontSize: "14px", color: "#7a9e5a",
     }).setOrigin(0.5, 0));
 
-    // Calculate layout
     const invH = this.inventory.rows * CELL_SIZE;
 
     // Equipment slots (left side)
@@ -281,15 +296,33 @@ export class InventoryUI {
       this.drawGrid(invX, lootY, this.lootInventory, "loot");
     }
 
-    // Close button (large tap target) - top-right X
-    const closeBg = this.ui(this.scene.add.rectangle(sw - 28, 22, 48, 36, 0xc04040, 0.6));
-    closeBg.setStrokeStyle(1, 0xc04040);
-    closeBg.setInteractive();
-    closeBg.setDepth(HUD_DEPTH + 52);
-    this.ui(this.scene.add.text(sw - 28, 22, "X", {
+    // Close button (visual) - top-right X
+    const closeCx = sw - 28;
+    const closeCy = 22;
+    const closeRect = this.ui(this.scene.add.rectangle(closeCx, closeCy, 48, 36, 0xc04040, 0.6), HUD_DEPTH + 52);
+    closeRect.setStrokeStyle(1, 0xc04040);
+    this.ui(this.scene.add.text(closeCx, closeCy, "X", {
       fontFamily: "monospace", fontSize: "18px", color: "#ffffff",
-    }).setOrigin(0.5)).setDepth(HUD_DEPTH + 53);
-    closeBg.on("pointerdown", () => this.close());
+    }).setOrigin(0.5), HUD_DEPTH + 53);
+    this.addHitZone(closeCx, closeCy, 48, 36, () => this.close());
+
+    // Global pointer handler using screen coordinates (bypasses Phaser hit test bug)
+    this.pointerHandler = (pointer: Phaser.Input.Pointer) => {
+      if (!this.isOpen) return;
+      const px = pointer.x;
+      const py = pointer.y;
+      // Check hit zones from last to first (topmost first)
+      for (let i = this.hitZones.length - 1; i >= 0; i--) {
+        const z = this.hitZones[i];
+        if (px >= z.x && px <= z.x + z.w && py >= z.y && py <= z.y + z.h) {
+          z.action();
+          return;
+        }
+      }
+      // Tap on empty area = close
+      this.close();
+    };
+    this.scene.input.on("pointerdown", this.pointerHandler);
   }
 
   private drawEquipSlots(startX: number, startY: number) {
@@ -305,13 +338,11 @@ export class InventoryUI {
 
       const slotBg = this.ui(this.scene.add.rectangle(sx + slotW / 2, sy + slotH / 2, slotW - 2, slotH - 2, 0x222233, 0.8));
       slotBg.setStrokeStyle(1, 0x444455);
-      slotBg.setInteractive();
 
       this.ui(this.scene.add.text(sx + 2, sy + 2, slotDef.label, {
         fontFamily: "monospace", fontSize: "7px", color: "#555566",
       }));
 
-      // Show equipped item
       const equipped = this.equippedItems.get(slotDef.key);
       if (equipped) {
         const def = ITEM_DEFS[equipped.defId];
@@ -320,11 +351,13 @@ export class InventoryUI {
           fontFamily: "monospace", fontSize: "8px", color: "#ffffff",
         }).setOrigin(0.5));
 
-        // Tap to unequip
-        slotBg.on("pointerdown", () => {
-          this.equippedItems.delete(slotDef.key);
-          this.inventory.autoAdd(equipped.defId, equipped.quantity);
-          if (this.onEquipCallback) this.onEquipCallback(slotDef.key, null);
+        // Hit zone for unequip
+        const capturedKey = slotDef.key;
+        const capturedEquipped = equipped;
+        this.addHitZone(sx + slotW / 2, sy + slotH / 2, slotW, slotH, () => {
+          this.equippedItems.delete(capturedKey);
+          this.inventory.autoAdd(capturedEquipped.defId, capturedEquipped.quantity);
+          if (this.onEquipCallback) this.onEquipCallback(capturedKey, null);
           this.rebuild();
         });
       }
@@ -337,7 +370,6 @@ export class InventoryUI {
     inv: GridInventory,
     source: "player" | "loot"
   ) {
-    // Grid cells
     for (let gy = 0; gy < inv.rows; gy++) {
       for (let gx = 0; gx < inv.cols; gx++) {
         const cx = startX + gx * CELL_SIZE + CELL_SIZE / 2;
@@ -347,7 +379,6 @@ export class InventoryUI {
       }
     }
 
-    // Draw items
     const drawn = new Set<InvItem>();
     for (const item of inv.items) {
       if (drawn.has(item)) continue;
@@ -360,23 +391,21 @@ export class InventoryUI {
       const iw = def.width * CELL_SIZE;
       const ih = def.height * CELL_SIZE;
 
-      const itemRect = this.ui(this.scene.add.rectangle(ix + iw / 2, iy + ih / 2, iw - 4, ih - 4, def.color, 0.6));
+      const itemRect = this.ui(this.scene.add.rectangle(ix + iw / 2, iy + ih / 2, iw - 4, ih - 4, def.color, 0.6), HUD_DEPTH + 51);
       itemRect.setStrokeStyle(1, 0xffffff, 0.3);
-      itemRect.setInteractive();
-      itemRect.setDepth(HUD_DEPTH + 51);
 
       this.ui(this.scene.add.text(ix + iw / 2, iy + ih / 2 - 5, def.name, {
         fontFamily: "monospace", fontSize: "7px", color: "#ffffff",
-      }).setOrigin(0.5)).setDepth(HUD_DEPTH + 51);
+      }).setOrigin(0.5), HUD_DEPTH + 51);
 
       if (def.stackable && item.quantity > 1) {
         this.ui(this.scene.add.text(ix + iw / 2, iy + ih / 2 + 6, `x${item.quantity}`, {
           fontFamily: "monospace", fontSize: "8px", color: "#d4a840",
-        }).setOrigin(0.5)).setDepth(HUD_DEPTH + 51);
+        }).setOrigin(0.5), HUD_DEPTH + 51);
       }
 
-      // Tap to interact
-      itemRect.on("pointerdown", () => {
+      // Hit zone for item tap
+      this.addHitZone(ix + iw / 2, iy + ih / 2, iw, ih, () => {
         this.onItemTap(item, source, inv);
       });
     }
