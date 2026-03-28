@@ -179,9 +179,16 @@ export class GridInventory {
   }
 }
 
-// ─── Inventory UI (Tetris-style overlay) ─────────────────────
-const CELL_SIZE = 36;
-const GRID_PAD = 8;
+// ─── Inventory UI (responsive, mobile-friendly) ─────────────
+// Item type color map for visual distinction
+const TYPE_COLORS: Record<string, { bg: number; border: number; icon: string }> = {
+  weapon:   { bg: 0x5a4030, border: 0xa07050, icon: "W" },
+  ammo:     { bg: 0x4a4a20, border: 0x908830, icon: "A" },
+  medical:  { bg: 0x304030, border: 0x50a050, icon: "+" },
+  food:     { bg: 0x3a3020, border: 0x907040, icon: "F" },
+  material: { bg: 0x303040, border: 0x606080, icon: "M" },
+  armor:    { bg: 0x2a3540, border: 0x5080a0, icon: "D" },
+};
 
 export class InventoryUI {
   private scene: Phaser.Scene;
@@ -194,11 +201,10 @@ export class InventoryUI {
   private pointerHandler: ((pointer: Phaser.Input.Pointer) => void) | null = null;
   private hitZones: { x: number; y: number; w: number; h: number; action: () => void }[] = [];
 
-  // Equipment slots layout
   private equipSlotDefs = [
-    { key: "weapon1", label: "Weapon 1", x: 0, y: 0, w: 4, h: 1 },
-    { key: "weapon2", label: "Weapon 2", x: 0, y: 1.3, w: 4, h: 1 },
-    { key: "armor", label: "Armor", x: 0, y: 2.6, w: 2, h: 2 },
+    { key: "weapon1", label: "WEAPON 1", w: 4, h: 1 },
+    { key: "weapon2", label: "WEAPON 2", w: 4, h: 1 },
+    { key: "armor",   label: "ARMOR",    w: 2, h: 2 },
   ];
 
   constructor(scene: Phaser.Scene, inventory: GridInventory) {
@@ -211,11 +217,7 @@ export class InventoryUI {
   }
 
   toggle(lootInv?: GridInventory) {
-    if (this.isOpen) {
-      this.close();
-    } else {
-      this.open(lootInv);
-    }
+    this.isOpen ? this.close() : this.open(lootInv);
   }
 
   open(lootInv?: GridInventory) {
@@ -227,9 +229,7 @@ export class InventoryUI {
   close() {
     this.isOpen = false;
     this.removePointerHandler();
-    for (const obj of this.uiObjects) {
-      if (obj && obj.active) obj.destroy();
-    }
+    for (const obj of this.uiObjects) { if (obj?.active) obj.destroy(); }
     this.uiObjects = [];
     this.hitZones = [];
   }
@@ -243,75 +243,95 @@ export class InventoryUI {
     }
   }
 
-  /** Helper: add a visual-only UI object (scrollFactor 0, no Phaser interactivity) */
   private ui<T extends Phaser.GameObjects.GameObject & { setScrollFactor: (x: number, y?: number) => T; setDepth: (d: number) => T }>(obj: T, depth = HUD_DEPTH + 50): T {
     obj.setScrollFactor(0).setDepth(depth);
     this.uiObjects.push(obj);
     return obj;
   }
 
-  /** Register a screen-coordinate tap zone (center x, center y, width, height) */
   private addHitZone(cx: number, cy: number, w: number, h: number, action: () => void) {
     this.hitZones.push({ x: cx - w / 2, y: cy - h / 2, w, h, action });
   }
 
   private rebuild() {
-    // Destroy old UI
-    for (const obj of this.uiObjects) {
-      if (obj && obj.active) obj.destroy();
-    }
+    for (const obj of this.uiObjects) { if (obj?.active) obj.destroy(); }
     this.uiObjects = [];
     this.hitZones = [];
     this.removePointerHandler();
 
     const sw = this.scene.scale.width;
     const sh = this.scene.scale.height;
+    const isLandscape = sw > sh;
 
-    // Background (visual only)
-    this.ui(this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x000000, 0.85));
+    // Dynamic cell size based on screen
+    const cellSize = isLandscape
+      ? Math.floor(Math.min((sh - 80) / (this.inventory.rows + (this.lootInventory ? 4 : 0)), (sw * 0.45) / this.inventory.cols))
+      : Math.floor(Math.min((sw - 20) / this.inventory.cols, (sh - 120) / (this.inventory.rows + 6)));
+    const cs = Math.max(28, Math.min(cellSize, 52));
 
-    // Title
-    this.ui(this.scene.add.text(sw / 2, 12, "INVENTORY", {
-      fontFamily: "monospace", fontSize: "14px", color: "#7a9e5a",
-    }).setOrigin(0.5, 0));
+    // Background
+    this.ui(this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x0e1210, 0.92));
 
-    const invH = this.inventory.rows * CELL_SIZE;
+    // Header bar
+    this.ui(this.scene.add.rectangle(sw / 2, 18, sw, 36, 0x1a2018, 0.95), HUD_DEPTH + 51);
+    this.ui(this.scene.add.text(sw / 2, 18, "INVENTORY", {
+      fontFamily: "monospace", fontSize: "16px", color: "#7a9e5a", fontStyle: "bold",
+    }).setOrigin(0.5), HUD_DEPTH + 52);
 
-    // Equipment slots (left side)
-    const equipX = GRID_PAD;
-    const equipY = 35;
-    this.drawEquipSlots(equipX, equipY);
+    // Close button
+    const closeCx = sw - 30;
+    const closeCy = 18;
+    this.ui(this.scene.add.rectangle(closeCx, closeCy, 52, 30, 0x8b3030, 0.8), HUD_DEPTH + 52)
+      .setStrokeStyle(1, 0xc04040);
+    this.ui(this.scene.add.text(closeCx, closeCy, "X", {
+      fontFamily: "monospace", fontSize: "20px", color: "#ffffff", fontStyle: "bold",
+    }).setOrigin(0.5), HUD_DEPTH + 53);
+    this.addHitZone(closeCx, closeCy, 52, 30, () => this.close());
 
-    // Player inventory grid (center)
-    const invX = equipX + 5 * CELL_SIZE + GRID_PAD;
-    const invY = 35;
-    this.drawGrid(invX, invY, this.inventory, "player");
+    if (isLandscape) {
+      // ── Landscape: equip left, grid center, loot right ──
+      const equipX = 10;
+      const equipY = 44;
+      this.drawEquipSlots(equipX, equipY, cs);
 
-    // Loot grid (below)
-    if (this.lootInventory) {
-      this.ui(this.scene.add.text(invX, invY + invH + 8, "LOOT", {
-        fontFamily: "monospace", fontSize: "11px", color: "#b08030",
-      }));
-      const lootY = invY + invH + 24;
-      this.drawGrid(invX, lootY, this.lootInventory, "loot");
+      const invX = equipX + 5 * cs + 14;
+      const invY = 44;
+      this.drawSectionLabel(invX, invY - 2, "BACKPACK");
+      this.drawGrid(invX, invY + 14, this.inventory, "player", cs);
+
+      if (this.lootInventory) {
+        const lootX = invX + this.inventory.cols * cs + 14;
+        this.drawSectionLabel(lootX, invY - 2, "LOOT");
+        this.drawGrid(lootX, invY + 14, this.lootInventory, "loot", cs);
+      }
+    } else {
+      // ── Portrait: equip top, grid middle, loot bottom ──
+      const contentX = Math.max(6, (sw - this.inventory.cols * cs) / 2);
+      let curY = 42;
+
+      // Equip slots (horizontal row)
+      this.drawEquipSlotsHorizontal(contentX, curY, cs);
+      curY += 2.5 * cs + 10;
+
+      // Backpack
+      this.drawSectionLabel(contentX, curY, "BACKPACK");
+      curY += 14;
+      this.drawGrid(contentX, curY, this.inventory, "player", cs);
+      curY += this.inventory.rows * cs + 8;
+
+      // Loot
+      if (this.lootInventory) {
+        this.drawSectionLabel(contentX, curY, "LOOT");
+        curY += 14;
+        this.drawGrid(contentX, curY, this.lootInventory, "loot", cs);
+      }
     }
 
-    // Close button (visual) - top-right X
-    const closeCx = sw - 28;
-    const closeCy = 22;
-    const closeRect = this.ui(this.scene.add.rectangle(closeCx, closeCy, 48, 36, 0xc04040, 0.6), HUD_DEPTH + 52);
-    closeRect.setStrokeStyle(1, 0xc04040);
-    this.ui(this.scene.add.text(closeCx, closeCy, "X", {
-      fontFamily: "monospace", fontSize: "18px", color: "#ffffff",
-    }).setOrigin(0.5), HUD_DEPTH + 53);
-    this.addHitZone(closeCx, closeCy, 48, 36, () => this.close());
-
-    // Global pointer handler using screen coordinates (bypasses Phaser hit test bug)
+    // Pointer handler
     this.pointerHandler = (pointer: Phaser.Input.Pointer) => {
       if (!this.isOpen) return;
       const px = pointer.x;
       const py = pointer.y;
-      // Check hit zones from last to first (topmost first)
       for (let i = this.hitZones.length - 1; i >= 0; i--) {
         const z = this.hitZones[i];
         if (px >= z.x && px <= z.x + z.w && py >= z.y && py <= z.y + z.h) {
@@ -319,66 +339,103 @@ export class InventoryUI {
           return;
         }
       }
-      // Tap on empty area = close
       this.close();
     };
     this.scene.input.on("pointerdown", this.pointerHandler);
   }
 
-  private drawEquipSlots(startX: number, startY: number) {
-    this.ui(this.scene.add.text(startX, startY - 2, "EQUIP", {
-      fontFamily: "monospace", fontSize: "10px", color: "#888888",
-    }));
+  private drawSectionLabel(x: number, y: number, text: string) {
+    this.ui(this.scene.add.text(x, y, text, {
+      fontFamily: "monospace", fontSize: "10px", color: "#607050", fontStyle: "bold",
+    }), HUD_DEPTH + 51);
+  }
 
+  private drawEquipSlots(startX: number, startY: number, cs: number) {
+    this.drawSectionLabel(startX, startY - 2, "EQUIP");
+
+    let slotY = startY + 14;
     for (const slotDef of this.equipSlotDefs) {
-      const sx = startX + slotDef.x * CELL_SIZE;
-      const sy = startY + 14 + slotDef.y * CELL_SIZE;
-      const slotW = slotDef.w * CELL_SIZE;
-      const slotH = slotDef.h * CELL_SIZE;
+      const slotW = slotDef.w * cs;
+      const slotH = slotDef.h * cs;
+      const cx = startX + slotW / 2;
+      const cy = slotY + slotH / 2;
 
-      const slotBg = this.ui(this.scene.add.rectangle(sx + slotW / 2, sy + slotH / 2, slotW - 2, slotH - 2, 0x222233, 0.8));
-      slotBg.setStrokeStyle(1, 0x444455);
-
-      this.ui(this.scene.add.text(sx + 2, sy + 2, slotDef.label, {
-        fontFamily: "monospace", fontSize: "7px", color: "#555566",
+      // Slot background
+      this.ui(this.scene.add.rectangle(cx, cy, slotW - 2, slotH - 2, 0x1a2018, 0.9))
+        .setStrokeStyle(1, 0x3a4a30);
+      // Slot label
+      this.ui(this.scene.add.text(startX + 4, slotY + 2, slotDef.label, {
+        fontFamily: "monospace", fontSize: "8px", color: "#4a5a40",
       }));
 
       const equipped = this.equippedItems.get(slotDef.key);
       if (equipped) {
-        const def = ITEM_DEFS[equipped.defId];
-        this.ui(this.scene.add.rectangle(sx + slotW / 2, sy + slotH / 2, slotW - 6, slotH - 6, def.color, 0.7));
-        this.ui(this.scene.add.text(sx + slotW / 2, sy + slotH / 2, def.name, {
-          fontFamily: "monospace", fontSize: "8px", color: "#ffffff",
-        }).setOrigin(0.5));
-
-        // Hit zone for unequip
-        const capturedKey = slotDef.key;
-        const capturedEquipped = equipped;
-        this.addHitZone(sx + slotW / 2, sy + slotH / 2, slotW, slotH, () => {
-          this.equippedItems.delete(capturedKey);
-          this.inventory.autoAdd(capturedEquipped.defId, capturedEquipped.quantity);
-          if (this.onEquipCallback) this.onEquipCallback(capturedKey, null);
-          this.rebuild();
-        });
+        this.drawEquippedItem(cx, cy, slotW, slotH, slotDef.key, equipped);
       }
+      slotY += slotH + 4;
     }
   }
 
-  private drawGrid(
-    startX: number,
-    startY: number,
-    inv: GridInventory,
-    source: "player" | "loot"
-  ) {
+  private drawEquipSlotsHorizontal(startX: number, startY: number, cs: number) {
+    this.drawSectionLabel(startX, startY, "EQUIP");
+    let sx = startX;
+    const sy = startY + 14;
+    for (const slotDef of this.equipSlotDefs) {
+      const slotW = slotDef.w * cs;
+      const slotH = slotDef.h * cs;
+      const cx = sx + slotW / 2;
+      const cy = sy + slotH / 2;
+
+      this.ui(this.scene.add.rectangle(cx, cy, slotW - 2, slotH - 2, 0x1a2018, 0.9))
+        .setStrokeStyle(1, 0x3a4a30);
+      this.ui(this.scene.add.text(sx + 3, sy + 2, slotDef.label, {
+        fontFamily: "monospace", fontSize: "7px", color: "#4a5a40",
+      }));
+
+      const equipped = this.equippedItems.get(slotDef.key);
+      if (equipped) {
+        this.drawEquippedItem(cx, cy, slotW, slotH, slotDef.key, equipped);
+      }
+      sx += slotW + 6;
+    }
+  }
+
+  private drawEquippedItem(cx: number, cy: number, w: number, h: number, key: string, item: InvItem) {
+    const def = ITEM_DEFS[item.defId];
+    const tc = TYPE_COLORS[def.type] || TYPE_COLORS.material;
+    this.ui(this.scene.add.rectangle(cx, cy, w - 6, h - 6, tc.bg, 0.9), HUD_DEPTH + 51)
+      .setStrokeStyle(2, tc.border);
+    this.ui(this.scene.add.text(cx, cy, def.name, {
+      fontFamily: "monospace", fontSize: "10px", color: "#e0d8c8", fontStyle: "bold",
+    }).setOrigin(0.5), HUD_DEPTH + 51);
+
+    const capturedKey = key;
+    const capturedItem = item;
+    this.addHitZone(cx, cy, w, h, () => {
+      this.equippedItems.delete(capturedKey);
+      this.inventory.autoAdd(capturedItem.defId, capturedItem.quantity);
+      if (this.onEquipCallback) this.onEquipCallback(capturedKey, null);
+      this.rebuild();
+    });
+  }
+
+  private drawGrid(startX: number, startY: number, inv: GridInventory, source: "player" | "loot", cs: number) {
+    // Grid background
+    const gridW = inv.cols * cs;
+    const gridH = inv.rows * cs;
+    this.ui(this.scene.add.rectangle(startX + gridW / 2, startY + gridH / 2, gridW + 2, gridH + 2, 0x0a0f0a, 0.5));
+
+    // Cells
     for (let gy = 0; gy < inv.rows; gy++) {
       for (let gx = 0; gx < inv.cols; gx++) {
-        const cx = startX + gx * CELL_SIZE + CELL_SIZE / 2;
-        const cy = startY + gy * CELL_SIZE + CELL_SIZE / 2;
-        const cell = this.ui(this.scene.add.rectangle(cx, cy, CELL_SIZE - 2, CELL_SIZE - 2, 0x1a1a2e, 0.8));
-        cell.setStrokeStyle(1, 0x333355);
+        const cx = startX + gx * cs + cs / 2;
+        const cy = startY + gy * cs + cs / 2;
+        this.ui(this.scene.add.rectangle(cx, cy, cs - 2, cs - 2, 0x161e14, 0.9))
+          .setStrokeStyle(1, 0x2a3628);
       }
     }
 
+    // Items
     const drawn = new Set<InvItem>();
     for (const item of inv.items) {
       if (drawn.has(item)) continue;
@@ -386,26 +443,43 @@ export class InventoryUI {
       const def = ITEM_DEFS[item.defId];
       if (!def || item.gridX < 0) continue;
 
-      const ix = startX + item.gridX * CELL_SIZE;
-      const iy = startY + item.gridY * CELL_SIZE;
-      const iw = def.width * CELL_SIZE;
-      const ih = def.height * CELL_SIZE;
+      const ix = startX + item.gridX * cs;
+      const iy = startY + item.gridY * cs;
+      const iw = def.width * cs;
+      const ih = def.height * cs;
+      const cx = ix + iw / 2;
+      const cy = iy + ih / 2;
 
-      const itemRect = this.ui(this.scene.add.rectangle(ix + iw / 2, iy + ih / 2, iw - 4, ih - 4, def.color, 0.6), HUD_DEPTH + 51);
-      itemRect.setStrokeStyle(1, 0xffffff, 0.3);
+      const tc = TYPE_COLORS[def.type] || TYPE_COLORS.material;
 
-      this.ui(this.scene.add.text(ix + iw / 2, iy + ih / 2 - 5, def.name, {
-        fontFamily: "monospace", fontSize: "7px", color: "#ffffff",
-      }).setOrigin(0.5), HUD_DEPTH + 51);
+      // Item background
+      this.ui(this.scene.add.rectangle(cx, cy, iw - 4, ih - 4, tc.bg, 0.85), HUD_DEPTH + 51)
+        .setStrokeStyle(2, tc.border);
 
+      // Type icon (top-left corner)
+      this.ui(this.scene.add.text(ix + 4, iy + 2, tc.icon, {
+        fontFamily: "monospace", fontSize: "9px", color: "#ffffff",
+        backgroundColor: `#${tc.border.toString(16).padStart(6, "0")}`,
+        padding: { x: 2, y: 0 },
+      }), HUD_DEPTH + 52);
+
+      // Item name (center, larger font)
+      const fontSize = iw > cs * 1.5 ? "10px" : "9px";
+      this.ui(this.scene.add.text(cx, cy - (def.stackable && item.quantity > 1 ? 4 : 0), def.name, {
+        fontFamily: "monospace", fontSize, color: "#e0d8c8", fontStyle: "bold",
+      }).setOrigin(0.5), HUD_DEPTH + 52);
+
+      // Quantity badge (bottom-right)
       if (def.stackable && item.quantity > 1) {
-        this.ui(this.scene.add.text(ix + iw / 2, iy + ih / 2 + 6, `x${item.quantity}`, {
-          fontFamily: "monospace", fontSize: "8px", color: "#d4a840",
-        }).setOrigin(0.5), HUD_DEPTH + 51);
+        this.ui(this.scene.add.text(ix + iw - 6, iy + ih - 6, `${item.quantity}`, {
+          fontFamily: "monospace", fontSize: "10px", color: "#d4a840", fontStyle: "bold",
+          backgroundColor: "#00000088",
+          padding: { x: 2, y: 0 },
+        }).setOrigin(1, 1), HUD_DEPTH + 52);
       }
 
-      // Hit zone for item tap
-      this.addHitZone(ix + iw / 2, iy + ih / 2, iw, ih, () => {
+      // Hit zone
+      this.addHitZone(cx, cy, iw, ih, () => {
         this.onItemTap(item, source, inv);
       });
     }
