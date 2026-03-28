@@ -164,7 +164,7 @@ export class RaidScene extends Phaser.Scene {
     );
     this.physics.add.existing(this.player);
     this.playerBody = this.player.body as Phaser.Physics.Arcade.Body;
-    this.playerBody.setCircle(PLAYER_RADIUS, 2, 2);
+    this.playerBody.setCircle(PLAYER_RADIUS, 4, 4);
     this.playerBody.setCollideWorldBounds(true);
 
     // Aim indicator

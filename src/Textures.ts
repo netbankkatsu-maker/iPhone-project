@@ -44,36 +44,84 @@ function createPlayerTexture(
   bodyColor: number,
   headColor: number
 ) {
-  const s = 32; // texture size
+  const s = 36;
+  const cx = s / 2;
+  const cy = s / 2;
   g.clear();
 
-  // Body (oval torso)
-  g.fillStyle(bodyColor);
-  g.fillEllipse(s / 2, s / 2 + 2, 18, 22);
+  // Shadow
+  g.fillStyle(0x000000, 0.2);
+  g.fillEllipse(cx + 1, cy + 2, 24, 28);
 
-  // Shoulders
+  // Legs (below body, visible at bottom)
+  g.fillStyle(darken(bodyColor, 0.6));
+  g.fillRect(cx - 5, cy + 6, 4, 8);
+  g.fillRect(cx + 1, cy + 6, 4, 8);
+
+  // Boots
+  g.fillStyle(0x2a2a20);
+  g.fillRect(cx - 6, cy + 12, 5, 4);
+  g.fillRect(cx + 1, cy + 12, 5, 4);
+
+  // Body / tactical vest (main torso)
   g.fillStyle(bodyColor);
-  g.fillRect(s / 2 - 12, s / 2 - 2, 24, 8);
+  g.fillRoundedRect(cx - 9, cy - 6, 18, 16, 3);
+
+  // Vest detail - pouches
+  g.fillStyle(darken(bodyColor, 0.8));
+  g.fillRect(cx - 8, cy - 1, 7, 5);
+  g.fillRect(cx + 1, cy - 1, 7, 5);
+  g.lineStyle(1, darken(bodyColor, 0.6), 0.5);
+  g.strokeRect(cx - 8, cy - 1, 7, 5);
+  g.strokeRect(cx + 1, cy - 1, 7, 5);
+
+  // Vest center line
+  g.lineStyle(1, darken(bodyColor, 0.5));
+  g.lineBetween(cx, cy - 5, cx, cy + 8);
+
+  // Arms
+  g.fillStyle(darken(bodyColor, 0.85));
+  g.fillRoundedRect(cx - 13, cy - 4, 5, 12, 2);  // left arm
+  g.fillRoundedRect(cx + 8, cy - 4, 5, 12, 2);   // right arm
+
+  // Gun (held in front, pointing up)
+  g.fillStyle(0x3a3a30);
+  g.fillRoundedRect(cx + 3, cy - 16, 4, 14, 1);  // barrel
+  g.fillStyle(0x4a4a3a);
+  g.fillRect(cx + 1, cy - 5, 8, 5);               // receiver
+  g.fillStyle(0x5a4a30);
+  g.fillRect(cx + 2, cy - 1, 5, 4);               // grip
+  // Muzzle flash hint
+  g.fillStyle(0x666650);
+  g.fillRect(cx + 3, cy - 17, 4, 2);
+
+  // Neck
+  g.fillStyle(0x8a7a60);
+  g.fillCircle(cx, cy - 8, 4);
 
   // Head
   g.fillStyle(headColor);
-  g.fillCircle(s / 2, s / 2 - 6, 6);
+  g.fillCircle(cx, cy - 10, 6);
 
-  // Helmet band
-  g.fillStyle(0x3a4a2a);
-  g.fillRect(s / 2 - 6, s / 2 - 8, 12, 3);
-
-  // Gun (right side, pointing right)
-  g.fillStyle(0x4a4a40);
-  g.fillRect(s / 2 + 4, s / 2 - 1, 12, 4);
-  g.fillStyle(0x3a3a30);
-  g.fillRect(s / 2 + 14, s / 2 - 2, 3, 6); // muzzle
-
-  // Backpack strap hint
-  g.fillStyle(0x3a4a2a);
-  g.fillRect(s / 2 - 3, s / 2 + 4, 6, 8);
+  // Helmet
+  g.fillStyle(darken(headColor, 0.7));
+  g.fillEllipse(cx, cy - 11, 14, 10);
+  // Helmet rim
+  g.lineStyle(1, darken(headColor, 0.5));
+  g.strokeEllipse(cx, cy - 11, 14, 10);
+  // NVG mount
+  g.fillStyle(0x2a2a2a);
+  g.fillRect(cx - 2, cy - 15, 4, 3);
 
   g.generateTexture(key, s, s);
+}
+
+/** Darken a hex color by a multiplier (0-1) */
+function darken(color: number, mult: number): number {
+  const r = Math.floor(((color >> 16) & 0xff) * mult);
+  const gr = Math.floor(((color >> 8) & 0xff) * mult);
+  const b = Math.floor((color & 0xff) * mult);
+  return (r << 16) | (gr << 8) | b;
 }
 
 function createBanditTexture(g: Phaser.GameObjects.Graphics, scene: Phaser.Scene) {
