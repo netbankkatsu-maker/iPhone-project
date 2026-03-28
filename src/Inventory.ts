@@ -257,9 +257,8 @@ export class InventoryUI {
     const sw = this.scene.scale.width;
     const sh = this.scene.scale.height;
 
-    // Semi-transparent background
+    // Semi-transparent background (not interactive - let clicks pass through to buttons)
     this.bg = this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x000000, 0.85);
-    this.bg.setInteractive();
     this.container.add(this.bg);
 
     // Title
@@ -293,12 +292,15 @@ export class InventoryUI {
       this.drawGrid(invX, lootY, this.lootInventory, this.lootCellGraphics, this.lootItemVisuals, "loot");
     }
 
-    // Close button
-    const closeBtn = this.scene.add.text(sw - 12, 8, "X", {
-      fontFamily: "monospace", fontSize: "18px", color: "#ff5252",
-    }).setOrigin(1, 0).setInteractive();
-    closeBtn.on("pointerdown", () => this.close());
+    // Close button (large tap target)
+    const closeBg = this.scene.add.rectangle(sw - 24, 20, 40, 32, 0xff5252, 0.3)
+      .setInteractive();
+    this.container.add(closeBg);
+    const closeBtn = this.scene.add.text(sw - 24, 20, "CLOSE", {
+      fontFamily: "monospace", fontSize: "11px", color: "#ff5252",
+    }).setOrigin(0.5);
     this.container.add(closeBtn);
+    closeBg.on("pointerdown", () => this.close());
   }
 
   private drawEquipSlots(startX: number, startY: number) {

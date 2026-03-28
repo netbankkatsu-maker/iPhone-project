@@ -38,7 +38,7 @@ export function spawnEnemy(
   hpBarBg.setDepth(20);
 
   // HP bar
-  const hpBar = scene.add.rectangle(x, y - cfg.radius - 8, 30, 4, 0xe53935);
+  const hpBar = scene.add.rectangle(x, y - cfg.radius - 8, 30, 4, 0xa04030);
   hpBar.setDepth(21);
 
   const data: EnemyData = {
@@ -187,7 +187,7 @@ function enemyShoot(
   const bx = x + Math.cos(a) * 20;
   const by = y + Math.sin(a) * 20;
 
-  const bullet = scene.add.circle(bx, by, BULLET_RADIUS, 0xff5252);
+  const bullet = scene.add.circle(bx, by, BULLET_RADIUS, 0xc06040);
   scene.physics.add.existing(bullet);
   const body = bullet.body as Phaser.Physics.Arcade.Body;
   body.setCircle(BULLET_RADIUS);

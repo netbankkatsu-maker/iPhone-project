@@ -199,14 +199,22 @@ export class RaidScene extends Phaser.Scene {
     });
     this.physics.add.overlap(this.bullets, this.enemies, (bullet, enemy) => {
       if (!(bullet as Phaser.GameObjects.Arc).active) return;
+      if (!(enemy as Phaser.GameObjects.Arc).active) return;
       const meta = (bullet as Phaser.GameObjects.Arc).getData("meta") as { damage: number };
       if (!meta) return;
+
+      // Capture enemy data BEFORE damageEnemy destroys it
+      const enemySprite = enemy as EnemySprite;
+      const ex = enemySprite.x;
+      const ey = enemySprite.y;
+      const enemyData = enemySprite.getData("enemyData");
+
       this.audio.playHit();
-      const killed = damageEnemy(this, enemy as EnemySprite, meta.damage);
+      const killed = damageEnemy(this, enemySprite, meta.damage);
       if (killed) {
         this.kills++;
-        this.dropEnemyLoot(enemy as EnemySprite);
-        this.showKillFeed(enemy as EnemySprite);
+        this.dropEnemyLootAt(ex, ey, enemyData);
+        this.showKillFeedFor(enemyData);
       }
       (bullet as Phaser.GameObjects.Arc).destroy();
     });
@@ -563,22 +571,26 @@ export class RaidScene extends Phaser.Scene {
     }
   }
 
-  private dropEnemyLoot(enemy: EnemySprite) {
-    // Create a small loot container at enemy death position
-    const box = this.add.rectangle(enemy.x, enemy.y, 16, 14, 0xef6c00);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private dropEnemyLootAt(x: number, y: number, data: any) {
+    const box = this.add.rectangle(x, y, 16, 14, 0xef6c00);
     box.setStrokeStyle(1, 0xffcc80);
     this.physics.add.existing(box, true);
 
     const lootInv = new GridInventory(3, 2);
-    const data = enemy.getData("enemyData");
-    const cfg = ENEMY_TYPES[data.type as EnemyType];
-    for (const lootId of cfg.loot) {
-      // Map generic loot names to item IDs
-      const mapped = mapLootId(lootId);
-      if (mapped) {
-        const def = ITEM_DEFS[mapped];
-        const qty = def.stackable ? Phaser.Math.Between(1, Math.ceil(def.maxStack / 4)) : 1;
-        lootInv.autoAdd(mapped, qty);
+    if (data) {
+      const cfg = ENEMY_TYPES[data.type as EnemyType];
+      if (cfg) {
+        for (const lootId of cfg.loot) {
+          const mapped = mapLootId(lootId);
+          if (mapped) {
+            const def = ITEM_DEFS[mapped];
+            if (def) {
+              const qty = def.stackable ? Phaser.Math.Between(1, Math.ceil(def.maxStack / 4)) : 1;
+              lootInv.autoAdd(mapped, qty);
+            }
+          }
+        }
       }
     }
     box.setData("lootInventory", lootInv);
@@ -774,9 +786,11 @@ export class RaidScene extends Phaser.Scene {
     });
   }
 
-  private showKillFeed(enemy: EnemySprite) {
-    const data = enemy.getData("enemyData");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private showKillFeedFor(data: any) {
+    if (!data) return;
     const cfg = ENEMY_TYPES[data.type as EnemyType];
+    if (!cfg) return;
     const w = this.scale.width;
 
     // Shift existing entries down

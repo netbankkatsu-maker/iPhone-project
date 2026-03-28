@@ -42,14 +42,14 @@ export class BaseScene extends Phaser.Scene {
     const h = this.scale.height;
 
     // Background
-    this.add.rectangle(w / 2, h / 2, w, h, 0x1a1a2e).setScrollFactor(0);
+    this.add.rectangle(w / 2, h / 2, w, h, 0x1a1f14).setScrollFactor(0);
 
     // Title
     this.add
       .text(w / 2, h * 0.06, "HIDEOUT", {
         fontFamily: "monospace",
         fontSize: "22px",
-        color: "#00e676",
+        color: "#7a9e5a",
       })
       .setOrigin(0.5)
       .setScrollFactor(0);
@@ -60,7 +60,7 @@ export class BaseScene extends Phaser.Scene {
       .text(w / 2, h * 0.13, `Lv.${this.stash.level}  XP: ${this.stash.xp}/${xpNeeded}  Money: $${this.stash.money}`, {
         fontFamily: "monospace",
         fontSize: "10px",
-        color: "#ffc107",
+        color: "#b08030",
       })
       .setOrigin(0.5)
       .setScrollFactor(0);
@@ -71,7 +71,7 @@ export class BaseScene extends Phaser.Scene {
         w / 2,
         h * 0.19,
         `Extracts: ${this.stash.totalExtracts}  |  Deaths: ${this.stash.totalDeaths}  |  Kills: ${this.stash.kills}`,
-        { fontFamily: "monospace", fontSize: "9px", color: "#8888aa" }
+        { fontFamily: "monospace", fontSize: "9px", color: "#706858" }
       )
       .setOrigin(0.5)
       .setScrollFactor(0);
@@ -82,7 +82,7 @@ export class BaseScene extends Phaser.Scene {
         .text(w / 2, h * 0.26, this.message, {
           fontFamily: "monospace",
           fontSize: "11px",
-          color: this.message.includes("DIED") ? "#ff5252" : "#00e5ff",
+          color: this.message.includes("DIED") ? "#c04040" : "#40b0a0",
           align: "center",
         })
         .setOrigin(0.5)
@@ -95,11 +95,11 @@ export class BaseScene extends Phaser.Scene {
     this.add.text(qx, qy, "TASKS", {
       fontFamily: "monospace",
       fontSize: "11px",
-      color: "#00e676",
+      color: "#7a9e5a",
     }).setScrollFactor(0);
 
     this.stash.quests.forEach((q, i) => {
-      const color = q.completed ? "#4caf50" : "#ccccdd";
+      const color = q.completed ? "#5c8a3c" : "#b8b0a0";
       const status = q.completed ? "[DONE]" : `[${q.progress}/${q.target}]`;
       this.add.text(qx, qy + 16 + i * 22, `${status} ${q.title}`, {
         fontFamily: "monospace",
@@ -109,7 +109,7 @@ export class BaseScene extends Phaser.Scene {
       this.add.text(qx + 8, qy + 27 + i * 22, q.description, {
         fontFamily: "monospace",
         fontSize: "7px",
-        color: "#666688",
+        color: "#585048",
       }).setScrollFactor(0);
     });
 
@@ -119,7 +119,7 @@ export class BaseScene extends Phaser.Scene {
     this.add.text(sx, sy, "TRADER", {
       fontFamily: "monospace",
       fontSize: "11px",
-      color: "#ffc107",
+      color: "#b08030",
     }).setScrollFactor(0);
 
     const shopItems = [
@@ -135,14 +135,14 @@ export class BaseScene extends Phaser.Scene {
         fontFamily: "monospace",
         fontSize: "9px",
         color: canAfford ? "#ffffff" : "#555555",
-        backgroundColor: canAfford ? "#333355" : "#222233",
+        backgroundColor: canAfford ? "#2a3020" : "#1a1f14",
         padding: { x: 4, y: 2 },
       }).setScrollFactor(0).setInteractive();
 
       if (canAfford) {
         btn.on("pointerdown", () => {
           this.stash.money -= item.cost;
-          btn.setStyle({ color: "#4caf50" });
+          btn.setStyle({ color: "#5c8a3c" });
           btn.setText(`${item.name} - BOUGHT`);
           btn.disableInteractive();
         });
@@ -151,7 +151,7 @@ export class BaseScene extends Phaser.Scene {
 
     // Deploy button
     const btnBg = this.add
-      .rectangle(w / 2, h * 0.82, 180, 44, 0x00e676, 0.9)
+      .rectangle(w / 2, h * 0.82, 180, 44, 0x5c8a3c, 0.9)
       .setScrollFactor(0)
       .setInteractive();
     this.add

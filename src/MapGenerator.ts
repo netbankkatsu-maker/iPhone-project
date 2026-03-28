@@ -39,10 +39,17 @@ export function generateMap(scene: Phaser.Scene): MapData {
   // Ground
   scene.add.rectangle(MAP_W / 2, MAP_H / 2, MAP_W, MAP_H, COLORS.ground);
 
-  // Grid
-  const gfx = scene.add.graphics({
-    lineStyle: { width: 1, color: 0x3a3a5e, alpha: 0.2 },
-  });
+  // Subtle ground texture (dirt patches)
+  const gfx = scene.add.graphics();
+  for (let i = 0; i < 60; i++) {
+    const dx = Phaser.Math.Between(50, MAP_W - 50);
+    const dy = Phaser.Math.Between(50, MAP_H - 50);
+    const dr = Phaser.Math.Between(20, 60);
+    gfx.fillStyle(0x252a1e, Phaser.Math.FloatBetween(0.1, 0.3));
+    gfx.fillCircle(dx, dy, dr);
+  }
+  // Sparse grid lines (cracked concrete feel)
+  gfx.lineStyle(1, 0x2a2f22, 0.12);
   for (let x = 0; x <= MAP_W; x += 100) gfx.lineBetween(x, 0, x, MAP_H);
   for (let y = 0; y <= MAP_H; y += 100) gfx.lineBetween(0, y, MAP_W, y);
 
@@ -115,7 +122,7 @@ export function generateMap(scene: Phaser.Scene): MapData {
     .text(extractionPoint.x, extractionPoint.y - EXTRACTION_RADIUS - 10, "EXTRACT", {
       fontFamily: "monospace",
       fontSize: "10px",
-      color: "#00e5ff",
+      color: "#40b0a0",
     })
     .setOrigin(0.5);
   scene.tweens.add({
@@ -161,11 +168,11 @@ export function generateMap(scene: Phaser.Scene): MapData {
 
     let go: Phaser.GameObjects.Arc;
     if (type === "landmine") {
-      go = scene.add.circle(hx, hy, radius, 0xff1744, 0.4);
-      go.setStrokeStyle(1, 0xff1744, 0.6);
+      go = scene.add.circle(hx, hy, radius, 0x8b4513, 0.35);
+      go.setStrokeStyle(1, 0xa05020, 0.5);
     } else {
-      go = scene.add.circle(hx, hy, radius, 0x69f0ae, 0.06);
-      go.setStrokeStyle(1, 0x69f0ae, 0.2);
+      go = scene.add.circle(hx, hy, radius, 0x556b2f, 0.08);
+      go.setStrokeStyle(1, 0x6b8e23, 0.18);
       scene.tweens.add({
         targets: go,
         alpha: { from: 0.04, to: 0.12 },
@@ -192,7 +199,7 @@ export function generateMap(scene: Phaser.Scene): MapData {
       dx, dy,
       isHorizontal ? 36 : 12,
       isHorizontal ? 12 : 36,
-      0x8d6e63, 0.7
+      0x5c4033, 0.8
     ).setDepth(5);
 
     doors.push({ x: dx, y: dy, isOpen: true, horizontal: isHorizontal, visual: doorVis });
@@ -260,9 +267,9 @@ function createRoom(
     addWall(scene, walls, cx + w / 2, cy, wallThick, h);
   }
 
-  // Floor tint
+  // Floor tint (concrete/wood interior)
   scene.add
-    .rectangle(cx, cy, w - wallThick * 2, h - wallThick * 2, 0x222238, 0.5)
+    .rectangle(cx, cy, w - wallThick * 2, h - wallThick * 2, 0x2a2820, 0.6)
     .setDepth(0);
 }
 
@@ -278,5 +285,5 @@ function addWall(
   walls.add(rect);
   const body = rect.body as Phaser.Physics.Arcade.StaticBody;
   body.setSize(w, h);
-  body.setOffset(-(w / 2), -(h / 2));
+  body.updateFromGameObject();
 }
