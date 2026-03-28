@@ -1,9 +1,10 @@
 import Phaser from "phaser";
 import { ENEMY_TYPES, EnemyType, BULLET_LIFETIME, BULLET_RADIUS } from "./constants";
 
-export interface EnemySprite extends Phaser.GameObjects.Arc {
+// Enemy sprite is now a Sprite (texture-based) instead of Arc
+export type EnemySprite = Phaser.GameObjects.Sprite & {
   getData(key: "enemyData"): EnemyData;
-}
+};
 
 export interface EnemyData {
   type: EnemyType;
@@ -17,6 +18,12 @@ export interface EnemyData {
   hpBarBg: Phaser.GameObjects.Rectangle;
 }
 
+const TEXTURE_MAP: Record<EnemyType, string> = {
+  bandit: "enemy_bandit",
+  mutant: "enemy_mutant",
+  heavy: "enemy_heavy",
+};
+
 export function spawnEnemy(
   scene: Phaser.Scene,
   x: number,
@@ -26,11 +33,12 @@ export function spawnEnemy(
   walls: Phaser.Physics.Arcade.StaticGroup
 ): EnemySprite {
   const cfg = ENEMY_TYPES[type];
+  const texKey = TEXTURE_MAP[type];
 
-  const enemy = scene.add.circle(x, y, cfg.radius, cfg.color) as EnemySprite;
+  const enemy = scene.add.sprite(x, y, texKey) as EnemySprite;
   scene.physics.add.existing(enemy);
   const body = enemy.body as Phaser.Physics.Arcade.Body;
-  body.setCircle(cfg.radius);
+  body.setCircle(cfg.radius, enemy.width / 2 - cfg.radius, enemy.height / 2 - cfg.radius);
   body.setCollideWorldBounds(true);
 
   // HP bar background
@@ -82,6 +90,11 @@ export function updateEnemy(
   const dy = playerY - enemy.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
 
+  // Rotate enemy to face movement/player
+  if (data.state === "chase" || data.state === "attack") {
+    enemy.setRotation(Math.atan2(dy, dx) - Math.PI / 2);
+  }
+
   // Update HP bar position
   if (data.hpBar.active && data.hpBarBg.active) {
     data.hpBar.setPosition(enemy.x, enemy.y - cfg.radius - 8);
@@ -129,6 +142,7 @@ export function updateEnemy(
         data.patrolTarget.y - enemy.y,
         data.patrolTarget.x - enemy.x
       );
+      enemy.setRotation(pa - Math.PI / 2);
       body.setVelocity(
         Math.cos(pa) * cfg.speed * 0.4,
         Math.sin(pa) * cfg.speed * 0.4
@@ -187,10 +201,10 @@ function enemyShoot(
   const bx = x + Math.cos(a) * 20;
   const by = y + Math.sin(a) * 20;
 
-  const bullet = scene.add.circle(bx, by, BULLET_RADIUS, 0xc06040);
+  const bullet = scene.add.sprite(bx, by, "bullet_enemy").setRotation(a);
   scene.physics.add.existing(bullet);
   const body = bullet.body as Phaser.Physics.Arcade.Body;
-  body.setCircle(BULLET_RADIUS);
+  body.setSize(6, 4);
   body.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
   bullet.setData("meta", { born: scene.time.now, damage: 10 });
   enemyBullets.add(bullet);
@@ -207,12 +221,11 @@ export function damageEnemy(
 
   data.hp -= damage;
 
-  // Flash white
-  const cfg = ENEMY_TYPES[data.type];
-  enemy.setFillStyle(0xffffff);
+  // Flash white on hit
+  enemy.setTintFill(0xffffff);
   scene.time.delayedCall(80, () => {
     if (!enemy.active) return;
-    enemy.setFillStyle(cfg.color);
+    enemy.clearTint();
   });
 
   if (data.hp <= 0) {

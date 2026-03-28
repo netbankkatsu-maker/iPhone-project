@@ -281,9 +281,17 @@ function addWall(
   w: number,
   h: number
 ) {
-  const rect = scene.add.rectangle(x, y, w, h, COLORS.wall);
-  walls.add(rect);
-  const body = rect.body as Phaser.Physics.Arcade.StaticBody;
+  // Use tiled wall texture if available, else fall back to rectangle
+  let wallObj: Phaser.GameObjects.GameObject;
+  if (scene.textures.exists("wall_tile")) {
+    const tile = scene.add.tileSprite(x, y, w, h, "wall_tile");
+    tile.setDepth(2);
+    wallObj = tile;
+  } else {
+    wallObj = scene.add.rectangle(x, y, w, h, COLORS.wall);
+  }
+  walls.add(wallObj);
+  const body = (wallObj as any).body as Phaser.Physics.Arcade.StaticBody;
   body.setSize(w, h);
   body.updateFromGameObject();
 }
