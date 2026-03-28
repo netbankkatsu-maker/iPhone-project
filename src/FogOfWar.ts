@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { MAP_W, MAP_H } from "./constants";
 
 const FOG_RES = 4; // Pixel scale factor for fog texture (lower = cheaper)
-const VIEW_RADIUS = 180;
+const VIEW_RADIUS = 160; // Slightly tighter view for tension
 
 export class FogOfWar {
   private fogTexture: Phaser.GameObjects.RenderTexture;
@@ -19,10 +19,10 @@ export class FogOfWar {
     this.fogTexture.setOrigin(0, 0);
     this.fogTexture.setScale(FOG_RES);
     this.fogTexture.setDepth(50);
-    this.fogTexture.setAlpha(0.85);
+    this.fogTexture.setAlpha(0.92); // Darker fog
 
-    // Fill with black (fog)
-    this.fogTexture.fill(0x0a0a1e);
+    // Fill with very dark color (near black, slight green tint)
+    this.fogTexture.fill(0x060a04);
 
     // Erase brush (circle gradient)
     this.brush = scene.add.graphics();
@@ -33,9 +33,11 @@ export class FogOfWar {
   private drawBrush() {
     const r = Math.ceil(VIEW_RADIUS / FOG_RES);
     this.brush.clear();
-    // Multiple circles for gradient fade
-    for (let i = r; i > 0; i -= 2) {
-      const alpha = 1 - (i / r) * 0.5;
+    // Soft gradient falloff for realistic vision
+    for (let i = r; i > 0; i -= 1) {
+      const t = i / r;
+      // Sharper falloff at edges
+      const alpha = t < 0.6 ? 1 : 1 - ((t - 0.6) / 0.4) * 0.7;
       this.brush.fillStyle(0xffffff, alpha);
       this.brush.fillCircle(r, r, i);
     }

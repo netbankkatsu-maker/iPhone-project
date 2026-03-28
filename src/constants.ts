@@ -107,19 +107,19 @@ export const MAP_W = 3000;
 export const MAP_H = 3000;
 export const TILE_SIZE = 100;
 
-// Colors – muted survival palette (earthy / military tones)
+// Colors – ZERO Sievert style (dark, desaturated, post-apocalyptic)
 export const COLORS = {
-  ground: 0x1a1f14,       // dark forest floor
-  wall: 0x4a4a3a,         // concrete / stone
-  playerAlive: 0x7a9e5a,  // olive drab
-  playerHurt: 0xc44040,   // blood red
-  extraction: 0x40b0a0,   // teal beacon
-  extractionGlow: 0x306860,
-  hpBar: 0x5c8a3c,        // military green
-  hpBarBg: 0x2a2a22,
-  ammoText: 0xb8b0a0,     // parchment
-  lootContainer: 0xb08030, // wooden crate
-  bullet: 0xd4a840,       // brass
+  ground: 0x141810,       // very dark forest floor
+  wall: 0x3a3830,         // concrete / stone
+  playerAlive: 0x4a6030,  // dark olive
+  playerHurt: 0x7a2020,   // dark blood red
+  extraction: 0x308880,   // muted teal
+  extractionGlow: 0x204840,
+  hpBar: 0x4a7030,        // dark military green
+  hpBarBg: 0x1a1a14,
+  ammoText: 0xa09880,     // muted parchment
+  lootContainer: 0x6a5020, // dark wood
+  bullet: 0xffdd44,       // bright tracer
 } as const;
 
 // UI

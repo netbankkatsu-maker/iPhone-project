@@ -37,12 +37,12 @@ export class HUD {
     const textStyle = {
       fontFamily: "monospace",
       fontSize: "12px",
-      color: "#b8b0a0",
+      color: "#9a9480",
     };
 
     // HP bar
     this.hpBarBg = scene.add
-      .rectangle(w / 2, 14, 160, 10, 0x333333)
+      .rectangle(w / 2, 14, 160, 10, 0x1a1a14)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH);
     this.hpBar = scene.add

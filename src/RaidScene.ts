@@ -167,15 +167,15 @@ export class RaidScene extends Phaser.Scene {
     this.playerBody.setCircle(PLAYER_RADIUS, 4, 4);
     this.playerBody.setCollideWorldBounds(true);
 
-    // Aim indicator
+    // Aim indicator (subtle laser-like dot)
     this.aimIndicator = this.add
-      .line(0, 0, 0, 0, 30, 0, COLORS.playerAlive, 0.5)
+      .line(0, 0, 0, 0, 24, 0, 0x88aa44, 0.35)
       .setOrigin(0, 0.5)
       .setDepth(10);
 
     // Camera
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setBackgroundColor("#1a1f14");
+    this.cameras.main.setBackgroundColor("#0a0e06");
 
     // Fog of War
     this.fog = new FogOfWar(this);
@@ -285,22 +285,22 @@ export class RaidScene extends Phaser.Scene {
     this.invButton = this.add
       .text(10, 24, "[BAG]", {
         fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#b8b0a0",
-        backgroundColor: "#2a3020",
-        padding: { x: 6, y: 3 },
+        fontSize: "11px",
+        color: "#8a8470",
+        backgroundColor: "#1a1e14",
+        padding: { x: 5, y: 3 },
       })
       .setScrollFactor(0)
       .setDepth(100);
 
     // Loot button (visual only, appears near loot containers)
-    this.lootButtonBg = this.add.rectangle(w / 2, h * 0.6, 80, 36, 0xb08030, 0.9)
+    this.lootButtonBg = this.add.rectangle(w / 2, h * 0.6, 72, 32, 0x6a5020, 0.85)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 2)
       .setVisible(false);
-    this.lootButtonBg.setStrokeStyle(2, 0xd4a840);
+    this.lootButtonBg.setStrokeStyle(1.5, 0x8a6828);
     this.lootButtonLabel = this.add.text(w / 2, h * 0.6, "LOOT", {
-      fontFamily: "monospace", fontSize: "15px", color: "#ffffff",
+      fontFamily: "monospace", fontSize: "13px", color: "#d0c8a0",
     }).setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 3)
@@ -604,11 +604,27 @@ export class RaidScene extends Phaser.Scene {
     this.ammo--;
     this.hud.updateAmmo(this.ammo, weapon.magSize);
 
+    // Muzzle flash effect
+    const flashAngle = Math.atan2(dirY, dirX);
+    const flashX = this.player.x + Math.cos(flashAngle) * 18;
+    const flashY = this.player.y + Math.sin(flashAngle) * 18;
+    if (this.textures.exists("muzzle_flash")) {
+      const flash = this.add.sprite(flashX, flashY, "muzzle_flash")
+        .setRotation(flashAngle)
+        .setAlpha(0.8)
+        .setScale(Phaser.Math.FloatBetween(0.6, 1.0))
+        .setDepth(15);
+      this.time.delayedCall(50, () => { if (flash.active) flash.destroy(); });
+    }
+
     // Audio
     this.audio.playShoot(this.currentWeapon);
 
+    // Screen shake (more for shotgun)
     if (this.currentWeapon === "shotgun") {
-      this.cameras.main.shake(80, 0.003);
+      this.cameras.main.shake(80, 0.004);
+    } else {
+      this.cameras.main.shake(30, 0.001);
     }
   }
 
