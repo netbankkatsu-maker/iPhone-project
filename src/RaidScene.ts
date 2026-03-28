@@ -278,7 +278,7 @@ export class RaidScene extends Phaser.Scene {
       this.inventoryUI.equipItem("weapon1", startPistol);
     }
 
-    // Inventory button (top-center-left)
+    // Inventory button (visual only, input via screen coords)
     this.invButton = this.add
       .text(10, 24, "[BAG]", {
         fontFamily: "monospace",
@@ -288,33 +288,44 @@ export class RaidScene extends Phaser.Scene {
         padding: { x: 6, y: 3 },
       })
       .setScrollFactor(0)
-      .setDepth(100)
-      .setInteractive();
-    this.invButton.on("pointerdown", () => {
-      if (this.inventoryUI.getIsOpen()) {
-        this.inventoryUI.close();
-      } else {
-        this.inventoryUI.open();
-      }
-    });
+      .setDepth(100);
 
-    // Loot button (appears when near loot container) - no Container, individual objects
+    // Loot button (visual only, appears near loot containers)
     this.lootButtonBg = this.add.rectangle(w / 2, h * 0.6, 80, 36, 0xb08030, 0.9)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 2)
       .setVisible(false);
     this.lootButtonBg.setStrokeStyle(2, 0xd4a840);
-    this.lootButtonBg.setInteractive();
     this.lootButtonLabel = this.add.text(w / 2, h * 0.6, "LOOT", {
       fontFamily: "monospace", fontSize: "15px", color: "#ffffff",
     }).setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 3)
       .setVisible(false);
-    this.lootButtonBg.on("pointerdown", () => {
-      if (this.nearbyLootContainer?.active) {
-        const lootInv = this.nearbyLootContainer.getData("lootInventory") as GridInventory;
-        this.inventoryUI.open(lootInv);
+
+    // Screen-coordinate input handler for BAG + LOOT buttons
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (!this.playerAlive || this.extracted) return;
+      // Don't handle if inventory is open (inventory has its own handler)
+      if (this.inventoryUI.getIsOpen()) return;
+      const px = pointer.x;
+      const py = pointer.y;
+
+      // BAG button hit test (top-left area)
+      if (px >= 10 && px <= 70 && py >= 24 && py <= 44) {
+        this.inventoryUI.open();
+        return;
+      }
+
+      // LOOT button hit test (center screen)
+      if (this.lootButtonBg.visible && this.nearbyLootContainer?.active) {
+        const lbx = this.lootButtonBg.x;
+        const lby = this.lootButtonBg.y;
+        if (px >= lbx - 40 && px <= lbx + 40 && py >= lby - 18 && py <= lby + 18) {
+          const lootInv = this.nearbyLootContainer.getData("lootInventory") as GridInventory;
+          this.inventoryUI.open(lootInv);
+          return;
+        }
       }
     });
 
