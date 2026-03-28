@@ -70,22 +70,27 @@ export function updateEnemy(
   enemyBullets: Phaser.GameObjects.Group,
   walls: Phaser.Physics.Arcade.StaticGroup
 ) {
+  if (!enemy.active) return;
   const data = enemy.getData("enemyData") as EnemyData;
-  if (data.state === "dead") return;
+  if (!data || data.state === "dead") return;
 
   const cfg = ENEMY_TYPES[data.type];
+  if (!cfg) return;
   const body = enemy.body as Phaser.Physics.Arcade.Body;
+  if (!body) return;
   const dx = playerX - enemy.x;
   const dy = playerY - enemy.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
 
   // Update HP bar position
-  data.hpBar.setPosition(enemy.x, enemy.y - cfg.radius - 8);
-  data.hpBarBg.setPosition(enemy.x, enemy.y - cfg.radius - 8);
-  const hpRatio = data.hp / data.maxHp;
-  data.hpBar.setSize(30 * hpRatio, 4);
-  data.hpBar.setVisible(data.hp < data.maxHp);
-  data.hpBarBg.setVisible(data.hp < data.maxHp);
+  if (data.hpBar.active && data.hpBarBg.active) {
+    data.hpBar.setPosition(enemy.x, enemy.y - cfg.radius - 8);
+    data.hpBarBg.setPosition(enemy.x, enemy.y - cfg.radius - 8);
+    const hpRatio = data.hp / data.maxHp;
+    data.hpBar.setSize(30 * hpRatio, 4);
+    data.hpBar.setVisible(data.hp < data.maxHp);
+    data.hpBarBg.setVisible(data.hp < data.maxHp);
+  }
 
   if (!playerAlive) {
     body.setVelocity(0, 0);
@@ -174,7 +179,7 @@ function enemyShoot(
   y: number,
   angle: number,
   enemyBullets: Phaser.GameObjects.Group,
-  walls: Phaser.Physics.Arcade.StaticGroup
+  _walls: Phaser.Physics.Arcade.StaticGroup
 ) {
   const speed = 350;
   const spread = (Math.random() - 0.5) * 0.15;
@@ -189,8 +194,6 @@ function enemyShoot(
   body.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
   bullet.setData("meta", { born: scene.time.now, damage: 10 });
   enemyBullets.add(bullet);
-
-  scene.physics.add.collider(bullet, walls, () => bullet.destroy());
 }
 
 export function damageEnemy(
@@ -198,26 +201,28 @@ export function damageEnemy(
   enemy: EnemySprite,
   damage: number
 ): boolean {
+  if (!enemy.active) return false;
   const data = enemy.getData("enemyData") as EnemyData;
+  if (!data || data.state === "dead") return false;
+
   data.hp -= damage;
 
   // Flash white
+  const cfg = ENEMY_TYPES[data.type];
   enemy.setFillStyle(0xffffff);
   scene.time.delayedCall(80, () => {
     if (!enemy.active) return;
-    const cfg = ENEMY_TYPES[data.type];
     enemy.setFillStyle(cfg.color);
   });
 
   if (data.hp <= 0) {
     data.state = "dead";
-    data.hpBar.destroy();
-    data.hpBarBg.destroy();
+    if (data.hpBar.active) data.hpBar.destroy();
+    if (data.hpBarBg.active) data.hpBarBg.destroy();
     enemy.destroy();
-    return true; // killed
+    return true;
   }
 
-  // Alert on damage
   data.alertTimer = 5000;
   return false;
 }

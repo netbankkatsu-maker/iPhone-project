@@ -90,4 +90,12 @@ export class VirtualJoystick {
     this.base.setVisible(visible);
     this.thumb.setVisible(visible);
   }
+
+  destroy() {
+    this.scene.input.off("pointerdown", this.onDown, this);
+    this.scene.input.off("pointermove", this.onMove, this);
+    this.scene.input.off("pointerup", this.onUp, this);
+    this.base.destroy();
+    this.thumb.destroy();
+  }
 }
