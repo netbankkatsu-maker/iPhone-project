@@ -31,6 +31,14 @@ import {
   InvItem,
   ITEM_DEFS,
 } from "./Inventory";
+import {
+  SurvivalStats,
+  createSurvivalStats,
+  updateSurvival,
+  applyItem,
+  onDamageTaken,
+  addRadiation,
+} from "./Survival";
 
 export class RaidScene extends Phaser.Scene {
   // Player
@@ -83,6 +91,10 @@ export class RaidScene extends Phaser.Scene {
   private invButton!: Phaser.GameObjects.Text;
   private nearbyLootContainer: Phaser.GameObjects.Rectangle | null = null;
 
+  // Survival
+  private survival!: SurvivalStats;
+  private radZones: { x: number; y: number; radius: number }[] = [];
+
   // Stash from base
   private stash: PlayerStash = { kills: 0, totalExtracts: 0, totalDeaths: 0 };
 
@@ -105,6 +117,7 @@ export class RaidScene extends Phaser.Scene {
     this.invincibleUntil = 0;
     this.armorValue = 0;
     this.nearbyLootContainer = null;
+    this.radZones = [];
   }
 
   create() {
@@ -184,6 +197,10 @@ export class RaidScene extends Phaser.Scene {
     this.hud.updateWeapon(this.currentWeapon);
     this.hud.updateAmmo(this.ammo, WEAPONS[this.currentWeapon].magSize);
 
+    // Survival system
+    this.survival = createSurvivalStats();
+    this.spawnRadZones();
+
     // Inventory system
     this.inventory = new GridInventory(8, 5);
     // Start with pistol and some ammo
@@ -232,9 +249,9 @@ export class RaidScene extends Phaser.Scene {
 
   private handleEquipChange(slot: string, item: InvItem | null) {
     if (slot === "use_medical" && item) {
-      const def = ITEM_DEFS[item.defId];
-      if (def.healAmount) {
-        this.playerHP = Math.min(PLAYER_MAX_HP, this.playerHP + def.healAmount);
+      const healed = applyItem(this.survival, item.defId);
+      if (healed > 0) {
+        this.playerHP = Math.min(PLAYER_MAX_HP, this.playerHP + healed);
         this.hud.updateHP(this.playerHP);
       }
       return;
@@ -411,12 +428,32 @@ export class RaidScene extends Phaser.Scene {
     // Check weapon pickup
     this.checkWeaponPickup();
 
+    // Survival update
+    const deltaSec = delta / 1000;
+    const isMoving = mx !== 0 || my !== 0;
+    const { hpDrain, speedMult } = updateSurvival(this.survival, deltaSec, isMoving, false);
+    if (hpDrain > 0) {
+      this.playerHP -= hpDrain;
+      if (this.playerHP <= 0) this.die();
+    }
+    // Apply speed modifier from survival effects
+    if (speedMult < 1) {
+      this.playerBody.setVelocity(
+        this.playerBody.velocity.x * speedMult,
+        this.playerBody.velocity.y * speedMult
+      );
+    }
+
+    // Radiation zone check
+    this.checkRadZones(deltaSec);
+
     // Extraction check
     this.checkExtraction(delta);
 
     // Update HUD
     this.hud.updateHP(this.playerHP);
     this.hud.updateKills(this.kills);
+    this.hud.updateSurvival(this.survival);
   }
 
   private shoot(dirX: number, dirY: number) {
@@ -518,6 +555,9 @@ export class RaidScene extends Phaser.Scene {
     const reduced = Math.max(1, amount - this.armorValue * 0.3);
     this.playerHP -= reduced;
     this.hud.updateHP(this.playerHP);
+
+    // Survival status effects from damage
+    onDamageTaken(this.survival, reduced);
 
     this.player.setFillStyle(COLORS.playerHurt);
     this.time.delayedCall(100, () => {
@@ -638,6 +678,49 @@ export class RaidScene extends Phaser.Scene {
         message: `EXTRACTED - ${this.kills} kills, loot secured.`,
       });
     });
+  }
+
+  private spawnRadZones() {
+    for (let i = 0; i < 4; i++) {
+      const rx = Phaser.Math.Between(300, MAP_W - 300);
+      const ry = Phaser.Math.Between(300, MAP_H - 300);
+      const rr = Phaser.Math.Between(60, 120);
+      this.radZones.push({ x: rx, y: ry, radius: rr });
+
+      // Visual
+      const zone = this.add.circle(rx, ry, rr, 0x76ff03, 0.08);
+      zone.setStrokeStyle(1, 0x76ff03, 0.3);
+      this.add
+        .text(rx, ry - rr - 6, "RADIATION", {
+          fontFamily: "monospace",
+          fontSize: "7px",
+          color: "#76ff03",
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.6);
+
+      this.tweens.add({
+        targets: zone,
+        alpha: { from: 0.05, to: 0.15 },
+        duration: 1200,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+  }
+
+  private checkRadZones(deltaSec: number) {
+    for (const rz of this.radZones) {
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        rz.x,
+        rz.y
+      );
+      if (dist < rz.radius) {
+        addRadiation(this.survival, 8 * deltaSec);
+      }
+    }
   }
 }
 
