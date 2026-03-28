@@ -95,7 +95,8 @@ export class RaidScene extends Phaser.Scene {
   private inventoryUI!: InventoryUI;
   private invButton!: Phaser.GameObjects.Text;
   private nearbyLootContainer: Phaser.GameObjects.Rectangle | null = null;
-  private lootButton!: Phaser.GameObjects.Container;
+  private lootButtonBg!: Phaser.GameObjects.Rectangle;
+  private lootButtonLabel!: Phaser.GameObjects.Text;
 
   // Survival
   private survival!: SurvivalStats;
@@ -282,8 +283,8 @@ export class RaidScene extends Phaser.Scene {
       .text(10, 24, "[BAG]", {
         fontFamily: "monospace",
         fontSize: "12px",
-        color: "#aaaacc",
-        backgroundColor: "#333355",
+        color: "#b8b0a0",
+        backgroundColor: "#2a3020",
         padding: { x: 6, y: 3 },
       })
       .setScrollFactor(0)
@@ -297,18 +298,20 @@ export class RaidScene extends Phaser.Scene {
       }
     });
 
-    // Loot button (appears when near loot container)
-    const lootBg = this.add.rectangle(0, 0, 70, 32, 0xb08030, 0.85);
-    lootBg.setStrokeStyle(1, 0xd4a840);
-    lootBg.setInteractive();
-    const lootLabel = this.add.text(0, 0, "LOOT", {
-      fontFamily: "monospace", fontSize: "14px", color: "#ffffff",
-    }).setOrigin(0.5);
-    this.lootButton = this.add.container(w / 2, h * 0.6, [lootBg, lootLabel])
+    // Loot button (appears when near loot container) - no Container, individual objects
+    this.lootButtonBg = this.add.rectangle(w / 2, h * 0.6, 80, 36, 0xb08030, 0.9)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 2)
       .setVisible(false);
-    lootBg.on("pointerdown", () => {
+    this.lootButtonBg.setStrokeStyle(2, 0xd4a840);
+    this.lootButtonBg.setInteractive();
+    this.lootButtonLabel = this.add.text(w / 2, h * 0.6, "LOOT", {
+      fontFamily: "monospace", fontSize: "15px", color: "#ffffff",
+    }).setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(HUD_DEPTH + 3)
+      .setVisible(false);
+    this.lootButtonBg.on("pointerdown", () => {
       if (this.nearbyLootContainer?.active) {
         const lootInv = this.nearbyLootContainer.getData("lootInventory") as GridInventory;
         this.inventoryUI.open(lootInv);
@@ -431,7 +434,8 @@ export class RaidScene extends Phaser.Scene {
     this.moveStick.reposition(w * 0.15, h * 0.7);
     this.aimStick.reposition(w * 0.85, h * 0.7);
     this.hud.onResize();
-    this.lootButton.setPosition(w / 2, h * 0.6);
+    this.lootButtonBg.setPosition(w / 2, h * 0.6);
+    this.lootButtonLabel.setPosition(w / 2, h * 0.6);
   }
 
   update(_time: number, delta: number) {
@@ -700,7 +704,8 @@ export class RaidScene extends Phaser.Scene {
         break;
       }
     }
-    this.lootButton.setVisible(nearLoot);
+    this.lootButtonBg.setVisible(nearLoot);
+    this.lootButtonLabel.setVisible(nearLoot);
     if (!nearLoot) this.hud.hideInteractHint();
   }
 
