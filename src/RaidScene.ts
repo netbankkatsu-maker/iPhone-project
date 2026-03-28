@@ -14,6 +14,7 @@ import {
   EXTRACTION_RADIUS,
   ENEMY_TYPES,
   EnemyType,
+  HUD_DEPTH,
 } from "./constants";
 import { VirtualJoystick } from "./VirtualJoystick";
 import { HUD } from "./HUD";
@@ -24,7 +25,7 @@ import {
   updateEnemy,
   damageEnemy,
 } from "./Enemy";
-import { PlayerStash } from "./BaseScene";
+import { PlayerStash, createDefaultStash } from "./BaseScene";
 import {
   GridInventory,
   InventoryUI,
@@ -40,6 +41,9 @@ import {
   addRadiation,
 } from "./Survival";
 import { FogOfWar } from "./FogOfWar";
+import { Minimap } from "./Minimap";
+import { AudioManager } from "./Audio";
+import { updateQuestProgress } from "./Quest";
 
 export class RaidScene extends Phaser.Scene {
   // Player
@@ -99,8 +103,17 @@ export class RaidScene extends Phaser.Scene {
   // Fog of War
   private fog!: FogOfWar;
 
+  // Minimap
+  private minimap!: Minimap;
+
+  // Audio
+  private audio!: AudioManager;
+
+  // Kill feed
+  private killFeed: Phaser.GameObjects.Text[] = [];
+
   // Stash from base
-  private stash: PlayerStash = { kills: 0, totalExtracts: 0, totalDeaths: 0 };
+  private stash: PlayerStash = createDefaultStash();
 
   constructor() {
     super("RaidScene");
@@ -161,6 +174,12 @@ export class RaidScene extends Phaser.Scene {
 
     // Fog of War
     this.fog = new FogOfWar(this);
+
+    // Minimap
+    this.minimap = new Minimap(this, this.mapData.extractionPoint.x, this.mapData.extractionPoint.y);
+
+    // Audio
+    this.audio = new AudioManager();
 
     // Collisions
     this.physics.add.collider(this.player, this.mapData.walls);
@@ -467,6 +486,9 @@ export class RaidScene extends Phaser.Scene {
     this.hud.updateHP(this.playerHP);
     this.hud.updateKills(this.kills);
     this.hud.updateSurvival(this.survival);
+
+    // Update minimap
+    this.minimap.update(this.player.x, this.player.y, this.enemies);
   }
 
   private shoot(dirX: number, dirY: number) {
@@ -499,10 +521,12 @@ export class RaidScene extends Phaser.Scene {
         const meta = (b as Phaser.GameObjects.Arc).getData("meta") as {
           damage: number;
         };
+        this.audio.playHit();
         const killed = damageEnemy(this, enemy as EnemySprite, meta.damage);
         if (killed) {
           this.kills++;
           this.dropEnemyLoot(enemy as EnemySprite);
+          this.showKillFeed(enemy as EnemySprite);
         }
         (b as Phaser.GameObjects.Arc).destroy();
       });
@@ -510,6 +534,9 @@ export class RaidScene extends Phaser.Scene {
 
     this.ammo--;
     this.hud.updateAmmo(this.ammo, weapon.magSize);
+
+    // Audio
+    this.audio.playShoot(this.currentWeapon);
 
     if (this.currentWeapon === "shotgun") {
       this.cameras.main.shake(80, 0.003);
@@ -572,6 +599,7 @@ export class RaidScene extends Phaser.Scene {
     // Survival status effects from damage
     onDamageTaken(this.survival, reduced);
 
+    this.audio.playDamage();
     this.player.setFillStyle(COLORS.playerHurt);
     this.time.delayedCall(100, () => {
       if (this.playerAlive) this.player.setFillStyle(COLORS.playerAlive);
@@ -637,6 +665,7 @@ export class RaidScene extends Phaser.Scene {
         const wType = pickup.getData("weaponType") as WeaponType;
         // Add to inventory instead of auto-equip
         if (this.inventory.autoAdd(wType, 1)) {
+          this.audio.playPickup();
           pickup.destroy();
         }
       }
@@ -678,11 +707,39 @@ export class RaidScene extends Phaser.Scene {
   private extract() {
     this.extracted = true;
     this.playerBody.setVelocity(0, 0);
+    this.audio.playExtract();
 
     this.stash.kills += this.kills;
     this.stash.totalExtracts++;
 
-    this.hud.showStatus("EXTRACTED!\n\nLoot secured.", "#00e5ff");
+    // Quest progress
+    updateQuestProgress(this.stash.quests, "extract", 1);
+    updateQuestProgress(this.stash.quests, "kill", this.kills);
+
+    // XP and money
+    const earnedXp = this.kills * 10 + 20;
+    const earnedMoney = this.kills * 30 + 50;
+    this.stash.xp += earnedXp;
+    this.stash.money += earnedMoney;
+
+    // Level up
+    const xpNeeded = this.stash.level * 100;
+    while (this.stash.xp >= xpNeeded) {
+      this.stash.xp -= xpNeeded;
+      this.stash.level++;
+    }
+
+    // Quest rewards
+    for (const q of this.stash.quests) {
+      if (q.completed && q.reward.money > 0) {
+        this.stash.money += q.reward.money;
+        this.stash.xp += q.reward.xp;
+        q.reward.money = 0;
+        q.reward.xp = 0;
+      }
+    }
+
+    this.hud.showStatus(`EXTRACTED!\n\n+${earnedXp}XP  +$${earnedMoney}`, "#00e5ff");
 
     this.cameras.main.fadeOut(2000, 0, 0, 0);
     this.time.delayedCall(3000, () => {
@@ -690,6 +747,39 @@ export class RaidScene extends Phaser.Scene {
         stash: this.stash,
         message: `EXTRACTED - ${this.kills} kills, loot secured.`,
       });
+    });
+  }
+
+  private showKillFeed(enemy: EnemySprite) {
+    const data = enemy.getData("enemyData");
+    const cfg = ENEMY_TYPES[data.type as EnemyType];
+    const w = this.scale.width;
+
+    // Shift existing entries down
+    for (const t of this.killFeed) {
+      t.y += 14;
+      if (t.y > 120) { t.destroy(); }
+    }
+    this.killFeed = this.killFeed.filter((t) => t.active);
+
+    const text = this.add
+      .text(w - 10, 44, `Killed ${cfg.name}`, {
+        fontFamily: "monospace",
+        fontSize: "9px",
+        color: "#ff8a80",
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(HUD_DEPTH);
+
+    this.killFeed.push(text);
+
+    this.tweens.add({
+      targets: text,
+      alpha: 0,
+      delay: 2000,
+      duration: 500,
+      onComplete: () => text.destroy(),
     });
   }
 
@@ -707,6 +797,7 @@ export class RaidScene extends Phaser.Scene {
         // Explode
         this.takeDamage(40);
         this.cameras.main.shake(200, 0.01);
+        this.audio.playExplosion();
         h.gameObject.destroy();
         // Explosion visual
         const explosion = this.add.circle(h.x, h.y, 30, 0xff6600, 0.6);
