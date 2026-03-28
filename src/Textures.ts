@@ -49,69 +49,70 @@ function createPlayerTexture(
   const cy = s / 2;
   g.clear();
 
-  // Shadow
-  g.fillStyle(0x000000, 0.2);
-  g.fillEllipse(cx + 1, cy + 2, 24, 28);
+  // === TRUE TOP-DOWN VIEW (looking straight down) ===
 
-  // Legs (below body, visible at bottom)
-  g.fillStyle(darken(bodyColor, 0.6));
-  g.fillRect(cx - 5, cy + 6, 4, 8);
-  g.fillRect(cx + 1, cy + 6, 4, 8);
+  // Drop shadow
+  g.fillStyle(0x000000, 0.18);
+  g.fillEllipse(cx + 1, cy + 1, 26, 26);
 
-  // Boots
-  g.fillStyle(0x2a2a20);
-  g.fillRect(cx - 6, cy + 12, 5, 4);
-  g.fillRect(cx + 1, cy + 12, 5, 4);
+  // Legs/feet (spread, seen from above - below torso)
+  g.fillStyle(darken(bodyColor, 0.5));
+  g.fillEllipse(cx - 5, cy + 7, 5, 7);   // left foot
+  g.fillEllipse(cx + 5, cy + 7, 5, 7);   // right foot
 
-  // Body / tactical vest (main torso)
+  // Torso / vest (oval from above)
   g.fillStyle(bodyColor);
-  g.fillRoundedRect(cx - 9, cy - 6, 18, 16, 3);
+  g.fillEllipse(cx, cy, 20, 22);
 
-  // Vest detail - pouches
-  g.fillStyle(darken(bodyColor, 0.8));
-  g.fillRect(cx - 8, cy - 1, 7, 5);
-  g.fillRect(cx + 1, cy - 1, 7, 5);
-  g.lineStyle(1, darken(bodyColor, 0.6), 0.5);
-  g.strokeRect(cx - 8, cy - 1, 7, 5);
-  g.strokeRect(cx + 1, cy - 1, 7, 5);
-
-  // Vest center line
-  g.lineStyle(1, darken(bodyColor, 0.5));
-  g.lineBetween(cx, cy - 5, cx, cy + 8);
-
-  // Arms
+  // Vest plate detail (front/back armor plates seen from above)
   g.fillStyle(darken(bodyColor, 0.85));
-  g.fillRoundedRect(cx - 13, cy - 4, 5, 12, 2);  // left arm
-  g.fillRoundedRect(cx + 8, cy - 4, 5, 12, 2);   // right arm
+  g.fillEllipse(cx, cy, 14, 16);
+  // Vest center seam (top-down)
+  g.lineStyle(1, darken(bodyColor, 0.5), 0.6);
+  g.lineBetween(cx, cy - 10, cx, cy + 10);
 
-  // Gun (held in front, pointing up)
+  // Shoulder pouches (top-down, on sides of torso)
+  g.fillStyle(darken(bodyColor, 0.7));
+  g.fillRoundedRect(cx - 12, cy - 4, 5, 8, 1);   // left shoulder
+  g.fillRoundedRect(cx + 7, cy - 4, 5, 8, 1);    // right shoulder
+
+  // Left arm (reaching forward)
+  g.fillStyle(darken(bodyColor, 0.75));
+  g.fillEllipse(cx - 9, cy - 5, 5, 8);
+
+  // Right arm (extended forward holding gun)
+  g.fillStyle(darken(bodyColor, 0.75));
+  g.fillEllipse(cx + 6, cy - 7, 5, 8);
+
+  // Gun (pointing up = forward in top-down)
+  g.fillStyle(0x2a2a22);
+  g.fillRoundedRect(cx + 4, cy - 16, 4, 12, 1);  // barrel
   g.fillStyle(0x3a3a30);
-  g.fillRoundedRect(cx + 3, cy - 16, 4, 14, 1);  // barrel
-  g.fillStyle(0x4a4a3a);
-  g.fillRect(cx + 1, cy - 5, 8, 5);               // receiver
-  g.fillStyle(0x5a4a30);
-  g.fillRect(cx + 2, cy - 1, 5, 4);               // grip
-  // Muzzle flash hint
-  g.fillStyle(0x666650);
-  g.fillRect(cx + 3, cy - 17, 4, 2);
+  g.fillRect(cx + 3, cy - 7, 6, 5);               // receiver body
+  // Muzzle
+  g.fillStyle(0x555545);
+  g.fillCircle(cx + 6, cy - 16, 2);
 
-  // Neck
-  g.fillStyle(0x8a7a60);
-  g.fillCircle(cx, cy - 8, 4);
-
-  // Head
+  // Head (helmet from above - round)
   g.fillStyle(headColor);
-  g.fillCircle(cx, cy - 10, 6);
+  g.fillCircle(cx, cy - 4, 7);
 
-  // Helmet
+  // Helmet rim (circular from top)
   g.fillStyle(darken(headColor, 0.7));
-  g.fillEllipse(cx, cy - 11, 14, 10);
-  // Helmet rim
-  g.lineStyle(1, darken(headColor, 0.5));
-  g.strokeEllipse(cx, cy - 11, 14, 10);
-  // NVG mount
+  g.fillCircle(cx, cy - 4, 7);
+  g.fillStyle(headColor);
+  g.fillCircle(cx, cy - 4, 5.5);
+
+  // Helmet top detail
+  g.fillStyle(darken(headColor, 0.6));
+  g.fillEllipse(cx, cy - 4, 6, 4);
+  // NVG mount (small rectangle on front of helmet)
   g.fillStyle(0x2a2a2a);
-  g.fillRect(cx - 2, cy - 15, 4, 3);
+  g.fillRect(cx - 2, cy - 9, 4, 3);
+
+  // Backpack (small hump behind head)
+  g.fillStyle(darken(bodyColor, 0.65));
+  g.fillEllipse(cx, cy + 4, 10, 6);
 
   g.generateTexture(key, s, s);
 }

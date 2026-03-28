@@ -217,11 +217,11 @@ export class HUD {
     this.reloadText.setVisible(show);
   }
 
-  showExtracting(show: boolean, progress = 0) {
+  showExtracting(show: boolean, progress = 0, totalMs = 3000) {
     this.extractionText.setVisible(show);
     if (show) {
-      const pct = Math.floor(progress * 100);
-      this.extractionText.setText(`EXTRACTING... ${pct}%`);
+      const remainSec = Math.max(0, ((1 - progress) * totalMs) / 1000);
+      this.extractionText.setText(`EXTRACTING... ${remainSec.toFixed(1)}s`);
     }
   }
 

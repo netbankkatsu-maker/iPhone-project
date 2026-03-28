@@ -40,143 +40,201 @@ export class BaseScene extends Phaser.Scene {
   create() {
     const w = this.scale.width;
     const h = this.scale.height;
+    const pad = 16;
+    const cardW = w - pad * 2;
 
-    // Background
-    this.add.rectangle(w / 2, h / 2, w, h, 0x1a1f14).setScrollFactor(0);
+    // Background - dark gradient feel
+    this.add.rectangle(w / 2, h / 2, w, h, 0x0f1410).setScrollFactor(0);
+    // Subtle top accent bar
+    this.add.rectangle(w / 2, 0, w, 3, 0x5c8a3c).setOrigin(0.5, 0).setScrollFactor(0);
 
-    // Title
-    this.add
-      .text(w / 2, h * 0.06, "HIDEOUT", {
-        fontFamily: "monospace",
-        fontSize: "22px",
-        color: "#7a9e5a",
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0);
+    // ── Header area ──
+    const headerY = 28;
+    this.add.text(w / 2, headerY, "HIDEOUT", {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: "#c8dca8",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0);
 
-    // Level & XP
+    // Money badge (top-right)
+    const moneyBg = this.add.rectangle(w - pad - 40, headerY, 80, 24, 0x1a2418, 0.9).setScrollFactor(0);
+    moneyBg.setStrokeStyle(1, 0x3a5a2a);
+    this.add.text(w - pad - 40, headerY, `$ ${this.stash.money}`, {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#b0d060",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0);
+
+    // Level badge (top-left)
+    const lvlBg = this.add.rectangle(pad + 30, headerY, 60, 24, 0x1a2418, 0.9).setScrollFactor(0);
+    lvlBg.setStrokeStyle(1, 0x3a5a2a);
+    this.add.text(pad + 30, headerY, `Lv.${this.stash.level}`, {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#b0d060",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0);
+
+    // XP bar
     const xpNeeded = this.stash.level * 100;
-    this.add
-      .text(w / 2, h * 0.13, `Lv.${this.stash.level}  XP: ${this.stash.xp}/${xpNeeded}  Money: $${this.stash.money}`, {
-        fontFamily: "monospace",
-        fontSize: "10px",
-        color: "#b08030",
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0);
+    const xpRatio = Math.min(1, this.stash.xp / xpNeeded);
+    const xpY = headerY + 20;
+    this.add.rectangle(w / 2, xpY, cardW, 4, 0x1a2418).setScrollFactor(0);
+    if (xpRatio > 0) {
+      this.add.rectangle(pad + (cardW * xpRatio) / 2, xpY, cardW * xpRatio, 4, 0x5c8a3c).setScrollFactor(0);
+    }
+    this.add.text(w / 2, xpY + 8, `XP ${this.stash.xp} / ${xpNeeded}`, {
+      fontFamily: "monospace", fontSize: "8px", color: "#5a7a4a",
+    }).setOrigin(0.5).setScrollFactor(0);
 
-    // Stats
-    this.add
-      .text(
-        w / 2,
-        h * 0.19,
-        `Extracts: ${this.stash.totalExtracts}  |  Deaths: ${this.stash.totalDeaths}  |  Kills: ${this.stash.kills}`,
-        { fontFamily: "monospace", fontSize: "9px", color: "#706858" }
-      )
-      .setOrigin(0.5)
-      .setScrollFactor(0);
-
-    // Message
+    // ── Message banner ──
+    let nextY = xpY + 22;
     if (this.message) {
-      this.add
-        .text(w / 2, h * 0.26, this.message, {
-          fontFamily: "monospace",
-          fontSize: "11px",
-          color: this.message.includes("DIED") ? "#c04040" : "#40b0a0",
-          align: "center",
-        })
-        .setOrigin(0.5)
-        .setScrollFactor(0);
+      const isDeath = this.message.includes("DIED");
+      const msgBg = this.add.rectangle(w / 2, nextY + 10, cardW, 28, isDeath ? 0x2a1010 : 0x102a20, 0.9).setScrollFactor(0);
+      msgBg.setStrokeStyle(1, isDeath ? 0x5a2020 : 0x2a5a3a);
+      this.add.text(w / 2, nextY + 10, this.message, {
+        fontFamily: "monospace",
+        fontSize: "11px",
+        color: isDeath ? "#ff6060" : "#60d0a0",
+        fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0);
+      nextY += 30;
     }
 
-    // Quests panel (left)
-    const qx = 12;
-    const qy = h * 0.34;
-    this.add.text(qx, qy, "TASKS", {
-      fontFamily: "monospace",
-      fontSize: "11px",
-      color: "#7a9e5a",
-    }).setScrollFactor(0);
+    // ── Stats row ──
+    nextY += 4;
+    const stats = [
+      { label: "RAIDS", val: `${this.stash.totalExtracts + this.stash.totalDeaths}` },
+      { label: "EXTRACT", val: `${this.stash.totalExtracts}` },
+      { label: "KILLS", val: `${this.stash.kills}` },
+    ];
+    const statW = Math.floor(cardW / stats.length);
+    stats.forEach((s, i) => {
+      const sx = pad + statW * i + statW / 2;
+      this.add.text(sx, nextY, s.val, {
+        fontFamily: "monospace", fontSize: "16px", color: "#e0dcc8", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0);
+      this.add.text(sx, nextY + 16, s.label, {
+        fontFamily: "monospace", fontSize: "8px", color: "#5a6a4a",
+      }).setOrigin(0.5).setScrollFactor(0);
+    });
+    nextY += 36;
+
+    // ── Card helper ──
+    const drawCard = (x: number, y: number, cw: number, ch: number, title: string, titleColor: string) => {
+      const bg = this.add.rectangle(x + cw / 2, y + ch / 2, cw, ch, 0x161c12, 0.95).setScrollFactor(0);
+      bg.setStrokeStyle(1, 0x2a3a22);
+      // Title bar
+      this.add.rectangle(x + cw / 2, y + 14, cw - 2, 26, 0x1c2418, 0.9).setScrollFactor(0);
+      this.add.text(x + 10, y + 14, title, {
+        fontFamily: "monospace", fontSize: "12px", color: titleColor, fontStyle: "bold",
+      }).setOrigin(0, 0.5).setScrollFactor(0);
+      return y + 30;
+    };
+
+    // ── Tasks card ──
+    const taskCardH = 14 + 28 + this.stash.quests.length * 32;
+    let ty = drawCard(pad, nextY, cardW, taskCardH, "TASKS", "#8ab060");
 
     this.stash.quests.forEach((q, i) => {
-      const color = q.completed ? "#5c8a3c" : "#b8b0a0";
-      const status = q.completed ? "[DONE]" : `[${q.progress}/${q.target}]`;
-      this.add.text(qx, qy + 16 + i * 22, `${status} ${q.title}`, {
-        fontFamily: "monospace",
-        fontSize: "9px",
-        color,
+      const done = q.completed;
+      const iy = ty + 4 + i * 32;
+
+      // Progress indicator
+      const progBg = this.add.rectangle(pad + 20, iy + 10, cardW - 40, 26, done ? 0x1a2a14 : 0x181c16, 0.8).setScrollFactor(0);
+      if (done) progBg.setStrokeStyle(1, 0x3a5a2a);
+
+      // Status dot
+      this.add.circle(pad + 18, iy + 10, 4, done ? 0x5c8a3c : 0x3a3a30).setScrollFactor(0);
+
+      this.add.text(pad + 28, iy + 4, q.title, {
+        fontFamily: "monospace", fontSize: "11px", color: done ? "#8ab060" : "#c8c0b0", fontStyle: "bold",
       }).setScrollFactor(0);
-      this.add.text(qx + 8, qy + 27 + i * 22, q.description, {
-        fontFamily: "monospace",
-        fontSize: "7px",
-        color: "#585048",
+      this.add.text(pad + 28, iy + 16, q.description, {
+        fontFamily: "monospace", fontSize: "8px", color: "#5a6a4a",
       }).setScrollFactor(0);
+
+      // Progress badge
+      const badge = done ? "DONE" : `${q.progress}/${q.target}`;
+      const badgeColor = done ? "#5c8a3c" : "#b0a080";
+      this.add.text(w - pad - 14, iy + 10, badge, {
+        fontFamily: "monospace", fontSize: "10px", color: badgeColor, fontStyle: "bold",
+      }).setOrigin(1, 0.5).setScrollFactor(0);
     });
+    nextY += taskCardH + 8;
 
-    // Shop (right side)
-    const sx = w / 2 + 10;
-    const sy = h * 0.34;
-    this.add.text(sx, sy, "TRADER", {
-      fontFamily: "monospace",
-      fontSize: "11px",
-      color: "#b08030",
-    }).setScrollFactor(0);
-
+    // ── Trader card ──
     const shopItems = [
       { name: "Bandage x3", cost: 30 },
       { name: "Medkit", cost: 80 },
       { name: "Water x2", cost: 20 },
       { name: "Canned Food x2", cost: 25 },
     ];
+    const shopCardH = 14 + 28 + shopItems.length * 38;
+    let sy = drawCard(pad, nextY, cardW, shopCardH, "TRADER", "#d0a040");
+
+    // Update money display ref
+    const moneyText = this.add.text(w - pad - 14, nextY + 14, `$ ${this.stash.money}`, {
+      fontFamily: "monospace", fontSize: "10px", color: "#b0d060",
+    }).setOrigin(1, 0.5).setScrollFactor(0);
 
     shopItems.forEach((item, i) => {
       const canAfford = this.stash.money >= item.cost;
-      const btn = this.add.text(sx, sy + 16 + i * 20, `${item.name} - $${item.cost}`, {
-        fontFamily: "monospace",
-        fontSize: "9px",
-        color: canAfford ? "#ffffff" : "#555555",
-        backgroundColor: canAfford ? "#2a3020" : "#1a1f14",
-        padding: { x: 4, y: 2 },
-      }).setScrollFactor(0).setInteractive();
+      const iy = sy + 6 + i * 38;
+
+      // Item row bg (acts as button)
+      const rowBg = this.add.rectangle(w / 2, iy + 14, cardW - 16, 32,
+        canAfford ? 0x1c2418 : 0x181816, 0.9
+      ).setScrollFactor(0).setInteractive();
+      rowBg.setStrokeStyle(1, canAfford ? 0x2a4a22 : 0x222220);
+
+      const nameT = this.add.text(pad + 18, iy + 8, item.name, {
+        fontFamily: "monospace", fontSize: "12px",
+        color: canAfford ? "#d8d0c0" : "#4a4a40", fontStyle: "bold",
+      }).setScrollFactor(0);
+
+      const costT = this.add.text(w - pad - 14, iy + 14, `$ ${item.cost}`, {
+        fontFamily: "monospace", fontSize: "12px",
+        color: canAfford ? "#b0d060" : "#3a3a30", fontStyle: "bold",
+      }).setOrigin(1, 0.5).setScrollFactor(0);
 
       if (canAfford) {
-        btn.on("pointerdown", () => {
+        rowBg.on("pointerdown", () => {
           this.stash.money -= item.cost;
-          btn.setStyle({ color: "#5c8a3c" });
-          btn.setText(`${item.name} - BOUGHT`);
-          btn.disableInteractive();
+          rowBg.setFillStyle(0x1a2a14);
+          rowBg.setStrokeStyle(1, 0x5c8a3c);
+          nameT.setStyle({ color: "#5c8a3c" });
+          costT.setText("BOUGHT");
+          costT.setStyle({ color: "#5c8a3c" });
+          rowBg.disableInteractive();
+          moneyText.setText(`$ ${this.stash.money}`);
         });
       }
     });
+    nextY += shopCardH + 12;
 
-    // Deploy button
-    const btnBg = this.add
-      .rectangle(w / 2, h * 0.82, 180, 44, 0x5c8a3c, 0.9)
-      .setScrollFactor(0)
-      .setInteractive();
-    this.add
-      .text(w / 2, h * 0.82, "DEPLOY", {
-        fontFamily: "monospace",
-        fontSize: "18px",
-        color: "#1a1a2e",
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(HUD_DEPTH);
+    // ── Deploy button ──
+    const deployY = Math.max(nextY + 10, h * 0.82);
+    const deployBg = this.add.rectangle(w / 2, deployY, cardW, 48, 0x5c8a3c, 1)
+      .setScrollFactor(0).setInteractive();
+    deployBg.setStrokeStyle(2, 0x8ab060);
+    this.add.text(w / 2, deployY, "DEPLOY", {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: "#0f1410",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH);
 
-    btnBg.on("pointerdown", () => {
+    deployBg.on("pointerdown", () => {
       this.scene.start("RaidScene", { stash: this.stash });
     });
 
-    // Instructions
-    this.add
-      .text(w / 2, h * 0.93, "Left: Move | Right: Aim & Shoot | EXTRACT to survive", {
-        fontFamily: "monospace",
-        fontSize: "8px",
-        color: "#555577",
-        align: "center",
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0);
+    // Hint
+    this.add.text(w / 2, deployY + 32, "Left: Move  |  Right: Aim & Shoot", {
+      fontFamily: "monospace", fontSize: "8px", color: "#3a4a30",
+    }).setOrigin(0.5).setScrollFactor(0);
   }
 }

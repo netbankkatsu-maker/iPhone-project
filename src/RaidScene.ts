@@ -760,7 +760,7 @@ export class RaidScene extends Phaser.Scene {
     if (dist < EXTRACTION_RADIUS) {
       this.isExtracting = true;
       this.extractionProgress += delta;
-      this.hud.showExtracting(true, this.extractionProgress / EXTRACTION_TIME);
+      this.hud.showExtracting(true, this.extractionProgress / EXTRACTION_TIME, EXTRACTION_TIME);
 
       if (this.extractionProgress >= EXTRACTION_TIME) {
         this.extract();
@@ -774,7 +774,8 @@ export class RaidScene extends Phaser.Scene {
         } else {
           this.hud.showExtracting(
             true,
-            this.extractionProgress / EXTRACTION_TIME
+            this.extractionProgress / EXTRACTION_TIME,
+            EXTRACTION_TIME
           );
         }
       }
