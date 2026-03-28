@@ -185,19 +185,10 @@ const GRID_PAD = 8;
 
 export class InventoryUI {
   private scene: Phaser.Scene;
-  private container: Phaser.GameObjects.Container;
+  private uiObjects: Phaser.GameObjects.GameObject[] = [];
   private inventory: GridInventory;
   private lootInventory: GridInventory | null = null;
-  private bg!: Phaser.GameObjects.Rectangle;
-  private cellGraphics: Phaser.GameObjects.Rectangle[][] = [];
-  private itemVisuals: Map<InvItem, Phaser.GameObjects.Container> = new Map();
-  private lootCellGraphics: Phaser.GameObjects.Rectangle[][] = [];
-  private lootItemVisuals: Map<InvItem, Phaser.GameObjects.Container> = new Map();
-  private dragItem: InvItem | null = null;
-  private dragSource: "player" | "loot" = "player";
-  private dragVisual: Phaser.GameObjects.Container | null = null;
   private isOpen = false;
-  private equipSlots: Map<string, Phaser.GameObjects.Rectangle> = new Map();
   private onEquipCallback: ((slot: string, item: InvItem | null) => void) | null = null;
   private equippedItems: Map<string, InvItem> = new Map();
 
@@ -211,7 +202,6 @@ export class InventoryUI {
   constructor(scene: Phaser.Scene, inventory: GridInventory) {
     this.scene = scene;
     this.inventory = inventory;
-    this.container = scene.add.container(0, 0).setDepth(HUD_DEPTH + 50).setScrollFactor(0).setVisible(false);
   }
 
   onEquip(cb: (slot: string, item: InvItem | null) => void) {
@@ -229,48 +219,47 @@ export class InventoryUI {
   open(lootInv?: GridInventory) {
     this.lootInventory = lootInv || null;
     this.isOpen = true;
-    this.container.setVisible(true);
     this.rebuild();
   }
 
   close() {
     this.isOpen = false;
-    this.container.setVisible(false);
-    this.container.removeAll(true);
-    this.cellGraphics = [];
-    this.lootCellGraphics = [];
-    this.itemVisuals.clear();
-    this.lootItemVisuals.clear();
-    this.equipSlots.clear();
+    for (const obj of this.uiObjects) {
+      if (obj && obj.active) obj.destroy();
+    }
+    this.uiObjects = [];
   }
 
   getIsOpen() { return this.isOpen; }
 
+  /** Helper: add a game object to the scene, set scrollFactor(0), track for cleanup */
+  private ui<T extends Phaser.GameObjects.GameObject & { setScrollFactor: (x: number, y?: number) => T; setDepth: (d: number) => T }>(obj: T): T {
+    obj.setScrollFactor(0).setDepth(HUD_DEPTH + 50);
+    this.uiObjects.push(obj);
+    return obj;
+  }
+
   private rebuild() {
-    this.container.removeAll(true);
-    this.cellGraphics = [];
-    this.lootCellGraphics = [];
-    this.itemVisuals.clear();
-    this.lootItemVisuals.clear();
-    this.equipSlots.clear();
+    // Destroy old UI
+    for (const obj of this.uiObjects) {
+      if (obj && obj.active) obj.destroy();
+    }
+    this.uiObjects = [];
 
     const sw = this.scene.scale.width;
     const sh = this.scene.scale.height;
 
-    // Semi-transparent background - tap to close
-    this.bg = this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x000000, 0.85);
-    this.bg.setInteractive();
-    this.bg.on("pointerdown", () => this.close());
-    this.container.add(this.bg);
+    // Background - tap to close
+    const bg = this.ui(this.scene.add.rectangle(sw / 2, sh / 2, sw, sh, 0x000000, 0.85));
+    bg.setInteractive();
+    bg.on("pointerdown", () => this.close());
 
     // Title
-    const title = this.scene.add.text(sw / 2, 12, "INVENTORY", {
+    this.ui(this.scene.add.text(sw / 2, 12, "INVENTORY", {
       fontFamily: "monospace", fontSize: "14px", color: "#7a9e5a",
-    }).setOrigin(0.5, 0);
-    this.container.add(title);
+    }).setOrigin(0.5, 0));
 
     // Calculate layout
-    const invW = this.inventory.cols * CELL_SIZE;
     const invH = this.inventory.rows * CELL_SIZE;
 
     // Equipment slots (left side)
@@ -281,71 +270,58 @@ export class InventoryUI {
     // Player inventory grid (center)
     const invX = equipX + 5 * CELL_SIZE + GRID_PAD;
     const invY = 35;
-    this.drawGrid(invX, invY, this.inventory, this.cellGraphics, this.itemVisuals, "player");
+    this.drawGrid(invX, invY, this.inventory, "player");
 
-    // Loot grid (right or below)
+    // Loot grid (below)
     if (this.lootInventory) {
-      const lootLabel = this.scene.add.text(invX, invY + invH + 8, "LOOT", {
-        fontFamily: "monospace", fontSize: "11px", color: "#ffc107",
-      });
-      this.container.add(lootLabel);
-
+      this.ui(this.scene.add.text(invX, invY + invH + 8, "LOOT", {
+        fontFamily: "monospace", fontSize: "11px", color: "#b08030",
+      }));
       const lootY = invY + invH + 24;
-      this.drawGrid(invX, lootY, this.lootInventory, this.lootCellGraphics, this.lootItemVisuals, "loot");
+      this.drawGrid(invX, lootY, this.lootInventory, "loot");
     }
 
     // Close button (large tap target) - top-right X
-    const closeBg = this.scene.add.rectangle(sw - 28, 22, 48, 36, 0xc04040, 0.5)
-      .setInteractive();
+    const closeBg = this.ui(this.scene.add.rectangle(sw - 28, 22, 48, 36, 0xc04040, 0.6));
     closeBg.setStrokeStyle(1, 0xc04040);
-    this.container.add(closeBg);
-    const closeBtn = this.scene.add.text(sw - 28, 22, "X", {
+    closeBg.setInteractive();
+    closeBg.setDepth(HUD_DEPTH + 52);
+    this.ui(this.scene.add.text(sw - 28, 22, "X", {
       fontFamily: "monospace", fontSize: "18px", color: "#ffffff",
-    }).setOrigin(0.5);
-    this.container.add(closeBtn);
-    closeBg.on("pointerdown", (p: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
-      event.stopPropagation();
-      this.close();
-    });
+    }).setOrigin(0.5)).setDepth(HUD_DEPTH + 53);
+    closeBg.on("pointerdown", () => this.close());
   }
 
   private drawEquipSlots(startX: number, startY: number) {
-    const label = this.scene.add.text(startX, startY - 2, "EQUIP", {
+    this.ui(this.scene.add.text(startX, startY - 2, "EQUIP", {
       fontFamily: "monospace", fontSize: "10px", color: "#888888",
-    });
-    this.container.add(label);
+    }));
 
     for (const slotDef of this.equipSlotDefs) {
       const sx = startX + slotDef.x * CELL_SIZE;
       const sy = startY + 14 + slotDef.y * CELL_SIZE;
-      const sw = slotDef.w * CELL_SIZE;
-      const sh = slotDef.h * CELL_SIZE;
+      const slotW = slotDef.w * CELL_SIZE;
+      const slotH = slotDef.h * CELL_SIZE;
 
-      const slotBg = this.scene.add.rectangle(sx + sw / 2, sy + sh / 2, sw - 2, sh - 2, 0x222244, 0.8);
-      slotBg.setStrokeStyle(1, 0x444466);
+      const slotBg = this.ui(this.scene.add.rectangle(sx + slotW / 2, sy + slotH / 2, slotW - 2, slotH - 2, 0x222233, 0.8));
+      slotBg.setStrokeStyle(1, 0x444455);
       slotBg.setInteractive();
-      this.container.add(slotBg);
-      this.equipSlots.set(slotDef.key, slotBg);
 
-      const slotLabel = this.scene.add.text(sx + 2, sy + 2, slotDef.label, {
-        fontFamily: "monospace", fontSize: "7px", color: "#555577",
-      });
-      this.container.add(slotLabel);
+      this.ui(this.scene.add.text(sx + 2, sy + 2, slotDef.label, {
+        fontFamily: "monospace", fontSize: "7px", color: "#555566",
+      }));
 
       // Show equipped item
       const equipped = this.equippedItems.get(slotDef.key);
       if (equipped) {
         const def = ITEM_DEFS[equipped.defId];
-        const itemRect = this.scene.add.rectangle(sx + sw / 2, sy + sh / 2, sw - 6, sh - 6, def.color, 0.7);
-        this.container.add(itemRect);
-        const itemName = this.scene.add.text(sx + sw / 2, sy + sh / 2, def.name, {
+        this.ui(this.scene.add.rectangle(sx + slotW / 2, sy + slotH / 2, slotW - 6, slotH - 6, def.color, 0.7));
+        this.ui(this.scene.add.text(sx + slotW / 2, sy + slotH / 2, def.name, {
           fontFamily: "monospace", fontSize: "8px", color: "#ffffff",
-        }).setOrigin(0.5);
-        this.container.add(itemName);
+        }).setOrigin(0.5));
 
         // Tap to unequip
-        slotBg.on("pointerdown", (_p: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
-          event.stopPropagation();
+        slotBg.on("pointerdown", () => {
           this.equippedItems.delete(slotDef.key);
           this.inventory.autoAdd(equipped.defId, equipped.quantity);
           if (this.onEquipCallback) this.onEquipCallback(slotDef.key, null);
@@ -359,20 +335,15 @@ export class InventoryUI {
     startX: number,
     startY: number,
     inv: GridInventory,
-    cellStore: Phaser.GameObjects.Rectangle[][],
-    itemStore: Map<InvItem, Phaser.GameObjects.Container>,
     source: "player" | "loot"
   ) {
     // Grid cells
     for (let gy = 0; gy < inv.rows; gy++) {
-      cellStore[gy] = [];
       for (let gx = 0; gx < inv.cols; gx++) {
         const cx = startX + gx * CELL_SIZE + CELL_SIZE / 2;
         const cy = startY + gy * CELL_SIZE + CELL_SIZE / 2;
-        const cell = this.scene.add.rectangle(cx, cy, CELL_SIZE - 2, CELL_SIZE - 2, 0x1a1a3e, 0.8);
-        cell.setStrokeStyle(1, 0x333366);
-        this.container.add(cell);
-        cellStore[gy][gx] = cell;
+        const cell = this.ui(this.scene.add.rectangle(cx, cy, CELL_SIZE - 2, CELL_SIZE - 2, 0x1a1a2e, 0.8));
+        cell.setStrokeStyle(1, 0x333355);
       }
     }
 
@@ -389,31 +360,23 @@ export class InventoryUI {
       const iw = def.width * CELL_SIZE;
       const ih = def.height * CELL_SIZE;
 
-      const itemContainer = this.scene.add.container(ix, iy);
-
-      const itemRect = this.scene.add.rectangle(iw / 2, ih / 2, iw - 4, ih - 4, def.color, 0.6);
+      const itemRect = this.ui(this.scene.add.rectangle(ix + iw / 2, iy + ih / 2, iw - 4, ih - 4, def.color, 0.6));
       itemRect.setStrokeStyle(1, 0xffffff, 0.3);
-      itemContainer.add(itemRect);
+      itemRect.setInteractive();
+      itemRect.setDepth(HUD_DEPTH + 51);
 
-      const nameText = this.scene.add.text(iw / 2, ih / 2 - 5, def.name, {
+      this.ui(this.scene.add.text(ix + iw / 2, iy + ih / 2 - 5, def.name, {
         fontFamily: "monospace", fontSize: "7px", color: "#ffffff",
-      }).setOrigin(0.5);
-      itemContainer.add(nameText);
+      }).setOrigin(0.5)).setDepth(HUD_DEPTH + 51);
 
       if (def.stackable && item.quantity > 1) {
-        const qtyText = this.scene.add.text(iw / 2, ih / 2 + 6, `x${item.quantity}`, {
-          fontFamily: "monospace", fontSize: "8px", color: "#ffeb3b",
-        }).setOrigin(0.5);
-        itemContainer.add(qtyText);
+        this.ui(this.scene.add.text(ix + iw / 2, iy + ih / 2 + 6, `x${item.quantity}`, {
+          fontFamily: "monospace", fontSize: "8px", color: "#d4a840",
+        }).setOrigin(0.5)).setDepth(HUD_DEPTH + 51);
       }
 
-      this.container.add(itemContainer);
-      itemStore.set(item, itemContainer);
-
-      // Tap to interact (stopPropagation prevents bg close)
-      itemRect.setInteractive();
-      itemRect.on("pointerdown", (_p: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
-        event.stopPropagation();
+      // Tap to interact
+      itemRect.on("pointerdown", () => {
         this.onItemTap(item, source, inv);
       });
     }
