@@ -261,7 +261,7 @@ export class RaidScene extends Phaser.Scene {
     this.spawnRadZones();
 
     // Inventory system
-    this.inventory = new GridInventory(8, 5);
+    this.inventory = new GridInventory(5, 4);
     // Start with pistol and some ammo
     this.inventory.autoAdd("pistol", 1);
     this.inventory.autoAdd("ammo_pistol", 24);
