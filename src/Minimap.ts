@@ -3,16 +3,13 @@ import { MAP_W, MAP_H, HUD_DEPTH } from "./constants";
 
 const MM_SIZE = 80;
 const MM_MARGIN = 8;
+const MAX_ENEMY_DOTS = 20;
 
 export class Minimap {
   private container: Phaser.GameObjects.Container;
-  private bg: Phaser.GameObjects.Rectangle;
   private playerDot: Phaser.GameObjects.Arc;
-  private extractDot: Phaser.GameObjects.Arc;
   private enemyDots: Phaser.GameObjects.Arc[] = [];
   private scene: Phaser.Scene;
-  private extractX: number;
-  private extractY: number;
 
   constructor(
     scene: Phaser.Scene,
@@ -20,8 +17,6 @@ export class Minimap {
     extractionY: number
   ) {
     this.scene = scene;
-    this.extractX = extractionX;
-    this.extractY = extractionY;
 
     const x = scene.scale.width - MM_SIZE - MM_MARGIN;
     const y = scene.scale.height - MM_SIZE - MM_MARGIN;
@@ -31,20 +26,27 @@ export class Minimap {
       .setDepth(HUD_DEPTH + 5);
 
     // Background
-    this.bg = scene.add.rectangle(MM_SIZE / 2, MM_SIZE / 2, MM_SIZE, MM_SIZE, 0x111122, 0.7);
-    this.bg.setStrokeStyle(1, 0x444466);
-    this.container.add(this.bg);
+    const bg = scene.add.rectangle(MM_SIZE / 2, MM_SIZE / 2, MM_SIZE, MM_SIZE, 0x111122, 0.7);
+    bg.setStrokeStyle(1, 0x444466);
+    this.container.add(bg);
 
     // Extraction marker
-    this.extractDot = scene.add.circle(
+    const extractDot = scene.add.circle(
       (extractionX / MAP_W) * MM_SIZE,
       (extractionY / MAP_H) * MM_SIZE,
       3,
       0x00e5ff
     );
-    this.container.add(this.extractDot);
+    this.container.add(extractDot);
 
-    // Player dot
+    // Pre-create enemy dot pool
+    for (let i = 0; i < MAX_ENEMY_DOTS; i++) {
+      const dot = scene.add.circle(0, 0, 1.5, 0xff3d00).setVisible(false);
+      this.container.add(dot);
+      this.enemyDots.push(dot);
+    }
+
+    // Player dot (on top)
     this.playerDot = scene.add.circle(0, 0, 2.5, 0x00e676);
     this.container.add(this.playerDot);
   }
@@ -54,7 +56,7 @@ export class Minimap {
     playerY: number,
     enemies: Phaser.GameObjects.Group
   ) {
-    // Player position on minimap
+    // Player position
     this.playerDot.setPosition(
       (playerX / MAP_W) * MM_SIZE,
       (playerY / MAP_H) * MM_SIZE
@@ -65,24 +67,30 @@ export class Minimap {
     const y = this.scene.scale.height - MM_SIZE - MM_MARGIN;
     this.container.setPosition(x, y);
 
-    // Clear old enemy dots
-    for (const dot of this.enemyDots) dot.destroy();
-    this.enemyDots = [];
-
-    // Enemy dots (only nearby ones)
+    // Update enemy dots from pool
+    let dotIdx = 0;
     for (const e of enemies.getChildren()) {
+      if (dotIdx >= MAX_ENEMY_DOTS) break;
+      if (!e.active) continue;
       const enemy = e as Phaser.GameObjects.Arc;
       const dist = Phaser.Math.Distance.Between(playerX, playerY, enemy.x, enemy.y);
       if (dist < 400) {
-        const dot = this.scene.add.circle(
+        const dot = this.enemyDots[dotIdx];
+        dot.setPosition(
           (enemy.x / MAP_W) * MM_SIZE,
-          (enemy.y / MAP_H) * MM_SIZE,
-          1.5,
-          0xff3d00
+          (enemy.y / MAP_H) * MM_SIZE
         );
-        this.container.add(dot);
-        this.enemyDots.push(dot);
+        dot.setVisible(true);
+        dotIdx++;
       }
     }
+    // Hide unused dots
+    for (let i = dotIdx; i < MAX_ENEMY_DOTS; i++) {
+      this.enemyDots[i].setVisible(false);
+    }
+  }
+
+  destroy() {
+    this.container.destroy(true);
   }
 }

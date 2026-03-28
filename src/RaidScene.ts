@@ -193,17 +193,40 @@ export class RaidScene extends Phaser.Scene {
     // Spawn weapon pickups
     this.spawnWeaponPickups();
 
+    // Group-level colliders (instead of per-bullet)
+    this.physics.add.collider(this.bullets, this.mapData.walls, (bullet) => {
+      (bullet as Phaser.GameObjects.Arc).destroy();
+    });
+    this.physics.add.overlap(this.bullets, this.enemies, (bullet, enemy) => {
+      if (!(bullet as Phaser.GameObjects.Arc).active) return;
+      const meta = (bullet as Phaser.GameObjects.Arc).getData("meta") as { damage: number };
+      if (!meta) return;
+      this.audio.playHit();
+      const killed = damageEnemy(this, enemy as EnemySprite, meta.damage);
+      if (killed) {
+        this.kills++;
+        this.dropEnemyLoot(enemy as EnemySprite);
+        this.showKillFeed(enemy as EnemySprite);
+      }
+      (bullet as Phaser.GameObjects.Arc).destroy();
+    });
+
     // Enemy bullets hit player
+    this.physics.add.collider(this.enemyBullets, this.mapData.walls, (bullet) => {
+      (bullet as Phaser.GameObjects.Arc).destroy();
+    });
     this.physics.add.overlap(
       this.player,
       this.enemyBullets,
       (_player, bullet) => {
+        if (!(bullet as Phaser.GameObjects.Arc).active) return;
         this.onPlayerHit(bullet as Phaser.GameObjects.Arc);
       }
     );
 
     // Melee enemies hit player
     this.physics.add.overlap(this.player, this.enemies, (_player, enemy) => {
+      if (!this.playerAlive) return;
       const data = (enemy as EnemySprite).getData("enemyData");
       if (!data || data.state === "dead") return;
       const cfg = ENEMY_TYPES[data.type as EnemyType];
@@ -262,7 +285,7 @@ export class RaidScene extends Phaser.Scene {
         this.inventoryUI.close();
       } else {
         // Check if near loot container
-        const lootInv = this.nearbyLootContainer
+        const lootInv = this.nearbyLootContainer?.active
           ? (this.nearbyLootContainer.getData("lootInventory") as GridInventory)
           : undefined;
         this.inventoryUI.open(lootInv);
@@ -271,6 +294,20 @@ export class RaidScene extends Phaser.Scene {
 
     // Resize handler
     this.scale.on("resize", this.onResize, this);
+
+    // Scene cleanup on shutdown
+    this.events.on("shutdown", this.cleanup, this);
+  }
+
+  private cleanup() {
+    this.scale.off("resize", this.onResize, this);
+    this.moveStick?.destroy();
+    this.aimStick?.destroy();
+    this.minimap?.destroy();
+    if (this.inventoryUI?.getIsOpen()) this.inventoryUI.close();
+    this.tweens.killAll();
+    for (const t of this.killFeed) { if (t.active) t.destroy(); }
+    this.killFeed = [];
   }
 
   private handleEquipChange(slot: string, item: InvItem | null) {
@@ -424,19 +461,20 @@ export class RaidScene extends Phaser.Scene {
     }
 
     // Update bullets lifetime
-    for (const b of this.bullets.getChildren()) {
-      const bullet = b as Phaser.GameObjects.Arc;
-      const meta = bullet.getData("meta") as { born: number };
-      if (this.time.now - meta.born > BULLET_LIFETIME) bullet.destroy();
+    for (const b of [...this.bullets.getChildren()]) {
+      if (!b.active) continue;
+      const meta = (b as Phaser.GameObjects.Arc).getData("meta") as { born: number } | null;
+      if (!meta || this.time.now - meta.born > BULLET_LIFETIME) b.destroy();
     }
-    for (const b of this.enemyBullets.getChildren()) {
-      const bullet = b as Phaser.GameObjects.Arc;
-      const meta = bullet.getData("meta") as { born: number };
-      if (this.time.now - meta.born > BULLET_LIFETIME) bullet.destroy();
+    for (const b of [...this.enemyBullets.getChildren()]) {
+      if (!b.active) continue;
+      const meta = (b as Phaser.GameObjects.Arc).getData("meta") as { born: number } | null;
+      if (!meta || this.time.now - meta.born > BULLET_LIFETIME) b.destroy();
     }
 
     // Update enemies
-    for (const e of this.enemies.getChildren()) {
+    for (const e of [...this.enemies.getChildren()]) {
+      if (!e.active) continue;
       updateEnemy(
         this,
         e as EnemySprite,
@@ -512,24 +550,6 @@ export class RaidScene extends Phaser.Scene {
 
       bullet.setData("meta", { born: this.time.now, damage: weapon.damage });
       this.bullets.add(bullet);
-
-      this.physics.add.collider(bullet, this.mapData.walls, () =>
-        bullet.destroy()
-      );
-
-      this.physics.add.overlap(bullet, this.enemies, (b, enemy) => {
-        const meta = (b as Phaser.GameObjects.Arc).getData("meta") as {
-          damage: number;
-        };
-        this.audio.playHit();
-        const killed = damageEnemy(this, enemy as EnemySprite, meta.damage);
-        if (killed) {
-          this.kills++;
-          this.dropEnemyLoot(enemy as EnemySprite);
-          this.showKillFeed(enemy as EnemySprite);
-        }
-        (b as Phaser.GameObjects.Arc).destroy();
-      });
     }
 
     this.ammo--;
@@ -566,7 +586,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private reload() {
-    if (this.isReloading) return;
+    if (this.isReloading || !this.playerAlive) return;
     const weapon = WEAPONS[this.currentWeapon];
     if (this.ammo >= weapon.magSize) return;
 
@@ -574,6 +594,7 @@ export class RaidScene extends Phaser.Scene {
     this.hud.showReloading(true);
 
     this.time.delayedCall(weapon.reloadTime, () => {
+      if (!this.playerAlive || !this.scene.isActive()) return;
       this.ammo = weapon.magSize;
       this.isReloading = false;
       this.hud.showReloading(false);
@@ -582,10 +603,10 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private onPlayerHit(bullet: Phaser.GameObjects.Arc) {
-    if (!this.playerAlive) return;
-    const meta = bullet.getData("meta") as { damage: number };
+    if (!this.playerAlive || !bullet.active) return;
+    const meta = bullet.getData("meta") as { damage: number } | null;
     bullet.destroy();
-    this.takeDamage(meta.damage);
+    if (meta) this.takeDamage(meta.damage);
   }
 
   private takeDamage(amount: number) {
@@ -615,7 +636,10 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private die() {
+    if (!this.playerAlive) return;
     this.playerAlive = false;
+    this.playerBody.setVelocity(0, 0);
+    this.playerBody.setImmovable(true);
     this.player.setFillStyle(0x555555);
     this.player.setAlpha(0.5);
     this.hud.showStatus("YOU DIED\n\nAll loot lost.", "#ff5252");
