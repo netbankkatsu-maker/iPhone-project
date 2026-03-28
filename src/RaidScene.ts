@@ -39,6 +39,7 @@ import {
   onDamageTaken,
   addRadiation,
 } from "./Survival";
+import { FogOfWar } from "./FogOfWar";
 
 export class RaidScene extends Phaser.Scene {
   // Player
@@ -94,6 +95,9 @@ export class RaidScene extends Phaser.Scene {
   // Survival
   private survival!: SurvivalStats;
   private radZones: { x: number; y: number; radius: number }[] = [];
+
+  // Fog of War
+  private fog!: FogOfWar;
 
   // Stash from base
   private stash: PlayerStash = { kills: 0, totalExtracts: 0, totalDeaths: 0 };
@@ -154,6 +158,9 @@ export class RaidScene extends Phaser.Scene {
     // Camera
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setBackgroundColor("#1a1a2e");
+
+    // Fog of War
+    this.fog = new FogOfWar(this);
 
     // Collisions
     this.physics.add.collider(this.player, this.mapData.walls);
@@ -447,6 +454,12 @@ export class RaidScene extends Phaser.Scene {
     // Radiation zone check
     this.checkRadZones(deltaSec);
 
+    // Environment hazards
+    this.checkHazards();
+
+    // Fog of War
+    this.fog.update(this.player.x, this.player.y);
+
     // Extraction check
     this.checkExtraction(delta);
 
@@ -678,6 +691,38 @@ export class RaidScene extends Phaser.Scene {
         message: `EXTRACTED - ${this.kills} kills, loot secured.`,
       });
     });
+  }
+
+  private checkHazards() {
+    for (const h of this.mapData.hazards) {
+      if (!h.gameObject.active) continue;
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        h.x,
+        h.y
+      );
+
+      if (h.type === "landmine" && dist < 20) {
+        // Explode
+        this.takeDamage(40);
+        this.cameras.main.shake(200, 0.01);
+        h.gameObject.destroy();
+        // Explosion visual
+        const explosion = this.add.circle(h.x, h.y, 30, 0xff6600, 0.6);
+        this.tweens.add({
+          targets: explosion,
+          alpha: 0,
+          scale: 2,
+          duration: 300,
+          onComplete: () => explosion.destroy(),
+        });
+      } else if (h.type === "toxic_gas" && dist < h.radius) {
+        // Slow poison
+        addRadiation(this.survival, 3 * (this.game.loop.delta / 1000));
+        this.takeDamage(0.5 * (this.game.loop.delta / 1000));
+      }
+    }
   }
 
   private spawnRadZones() {
