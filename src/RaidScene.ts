@@ -379,7 +379,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private spawnEnemies() {
-    const types: EnemyType[] = ["bandit", "bandit", "bandit", "mutant", "mutant", "heavy"];
+    const types: EnemyType[] = ["bandit", "bandit", "bandit", "bandit", "mutant", "mutant", "mutant", "heavy", "heavy"];
     for (const pt of this.mapData.enemySpawnPoints) {
       const type = types[Phaser.Math.Between(0, types.length - 1)];
       spawnEnemy(this, pt.x, pt.y, type, this.enemies, this.mapData.walls);
@@ -419,9 +419,8 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private spawnWeaponPickups() {
-    // Weapon pickups are now inside loot containers, but keep a few on the ground
     const weaponTypes: WeaponType[] = ["smg", "shotgun", "rifle"];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6; i++) {
       const type = weaponTypes[Phaser.Math.Between(0, weaponTypes.length - 1)];
       const x = Phaser.Math.Between(200, MAP_W - 200);
       const y = Phaser.Math.Between(200, MAP_H - 200);

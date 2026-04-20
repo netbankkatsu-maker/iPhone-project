@@ -103,8 +103,8 @@ export const ENEMY_TYPES = {
 export type EnemyType = keyof typeof ENEMY_TYPES;
 
 // Map
-export const MAP_W = 3000;
-export const MAP_H = 3000;
+export const MAP_W = 6000;
+export const MAP_H = 6000;
 export const TILE_SIZE = 100;
 
 // Colors – ZERO Sievert style (dark, desaturated, post-apocalyptic)
