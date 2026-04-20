@@ -30,6 +30,11 @@ export class HUD {
   private fractureIcon: Phaser.GameObjects.Text;
   private radIcon: Phaser.GameObjects.Text;
 
+  // Time display
+  private timeText: Phaser.GameObjects.Text;
+  // Event warning
+  private eventText: Phaser.GameObjects.Text;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     const w = scene.scale.width;
@@ -141,6 +146,16 @@ export class HUD {
       .text(10, 8, "Kills: 0", textStyle)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH);
+
+    // Time display (top center-left)
+    this.timeText = scene.add.text(10, 40, "06:00", {
+      fontFamily: "monospace", fontSize: "10px", color: "#8090a0",
+    }).setScrollFactor(0).setDepth(HUD_DEPTH);
+
+    // Event warning
+    this.eventText = scene.add.text(w / 2, 60, "", {
+      fontFamily: "monospace", fontSize: "12px", color: "#ff6040", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH).setVisible(false);
 
     // Interact hint
     this.interactHint = scene.add
@@ -254,6 +269,20 @@ export class HUD {
 
   hideInteractHint() {
     this.interactHint.setVisible(false);
+  }
+
+  updateTime(timeStr: string, isNight: boolean) {
+    this.timeText.setText(timeStr);
+    this.timeText.setColor(isNight ? "#4060a0" : "#8090a0");
+  }
+
+  showEvent(text: string) {
+    this.eventText.setText(text);
+    this.eventText.setVisible(true);
+  }
+
+  hideEvent() {
+    this.eventText.setVisible(false);
   }
 
   onResize() {

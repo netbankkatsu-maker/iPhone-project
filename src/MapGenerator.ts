@@ -25,13 +25,31 @@ export interface HazardDef {
   gameObject: Phaser.GameObjects.Arc;
 }
 
+export interface ExtractionDef {
+  point: Phaser.Math.Vector2;
+  zone: Phaser.GameObjects.Arc;
+  label: Phaser.GameObjects.Text;
+}
+
+export interface NPCDef {
+  x: number;
+  y: number;
+  name: string;
+  visual: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle;
+}
+
 export interface MapData {
   walls: Phaser.Physics.Arcade.StaticGroup;
   spawnPoint: Phaser.Math.Vector2;
   extractionPoint: Phaser.Math.Vector2;
   extractionZone: Phaser.GameObjects.Arc;
+  extractions: ExtractionDef[];
   enemySpawnPoints: Phaser.Math.Vector2[];
+  bossSpawnPoints: Phaser.Math.Vector2[];
+  patrolSquadSpawns: { points: Phaser.Math.Vector2[]; type: string }[];
   lootPoints: Phaser.Math.Vector2[];
+  hiddenStashes: Phaser.Math.Vector2[];
+  npcLocations: NPCDef[];
   hazards: HazardDef[];
   doors: DoorDef[];
 }
@@ -228,36 +246,33 @@ export function generateMap(scene: Phaser.Scene): MapData {
     Phaser.Math.Between(MAP_H - 500, MAP_H - 100)
   );
 
-  // ── Extraction point (top-right, far from spawn) ──
-  const extractionPoint = new Phaser.Math.Vector2(
-    Phaser.Math.Between(MAP_W - 700, MAP_W - 100),
-    Phaser.Math.Between(100, 700)
-  );
+  // ── Multiple extraction points (3 spread around map edges) ──
+  const extractionDefs: { x: number; y: number; name: string }[] = [
+    { x: Phaser.Math.Between(MAP_W - 700, MAP_W - 100), y: Phaser.Math.Between(100, 700), name: "EXTRACT-A" },
+    { x: Phaser.Math.Between(100, 600), y: Phaser.Math.Between(100, 600), name: "EXTRACT-B" },
+    { x: Phaser.Math.Between(MAP_W / 2 - 300, MAP_W / 2 + 300), y: Phaser.Math.Between(100, 400), name: "EXTRACT-C" },
+  ];
 
-  // Extraction visual
-  const extractionZone = scene.add.circle(
-    extractionPoint.x,
-    extractionPoint.y,
-    EXTRACTION_RADIUS,
-    COLORS.extraction,
-    0.15
-  );
-  extractionZone.setStrokeStyle(1.5, COLORS.extraction, 0.4);
-
-  const extLabel = scene.add
-    .text(extractionPoint.x, extractionPoint.y - EXTRACTION_RADIUS - 8, "EXTRACT", {
-      fontFamily: "monospace",
-      fontSize: "9px",
-      color: "#40a090",
-    })
-    .setOrigin(0.5);
-  scene.tweens.add({
-    targets: [extractionZone, extLabel],
-    alpha: { from: 0.2, to: 0.6 },
-    duration: 1200,
-    yoyo: true,
-    repeat: -1,
+  const extractions: ExtractionDef[] = extractionDefs.map(ed => {
+    const pt = new Phaser.Math.Vector2(ed.x, ed.y);
+    const zone = scene.add.circle(pt.x, pt.y, EXTRACTION_RADIUS, COLORS.extraction, 0.15);
+    zone.setStrokeStyle(1.5, COLORS.extraction, 0.4);
+    const label = scene.add.text(pt.x, pt.y - EXTRACTION_RADIUS - 8, ed.name, {
+      fontFamily: "monospace", fontSize: "9px", color: "#40a090",
+    }).setOrigin(0.5);
+    scene.tweens.add({
+      targets: [zone, label],
+      alpha: { from: 0.2, to: 0.6 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+    });
+    return { point: pt, zone, label };
   });
+
+  // Primary extraction (for backward compat)
+  const extractionPoint = extractions[0].point;
+  const extractionZone = extractions[0].zone;
 
   // ── Enemy spawn points (spread across entire map) ──
   const enemySpawnPoints: Phaser.Math.Vector2[] = [];
@@ -374,13 +389,80 @@ export function generateMap(scene: Phaser.Scene): MapData {
     bgfx.fillCircle(bx, by, 4);
   }
 
+  // ── Boss spawn points (2, far from spawn) ──
+  const bossSpawnPoints: Phaser.Math.Vector2[] = [];
+  for (let i = 0; i < 2; i++) {
+    let bx: number, by: number;
+    do {
+      bx = Phaser.Math.Between(800, MAP_W - 800);
+      by = Phaser.Math.Between(800, MAP_H - 800);
+    } while (Phaser.Math.Distance.Between(bx, by, spawnPoint.x, spawnPoint.y) < 1500);
+    bossSpawnPoints.push(new Phaser.Math.Vector2(bx, by));
+  }
+
+  // ── Patrol squad spawns (groups of 3 enemies that patrol together) ──
+  const patrolSquadSpawns: { points: Phaser.Math.Vector2[]; type: string }[] = [];
+  for (let i = 0; i < 4; i++) {
+    const cx = Phaser.Math.Between(500, MAP_W - 500);
+    const cy = Phaser.Math.Between(500, MAP_H - 500);
+    if (Phaser.Math.Distance.Between(cx, cy, spawnPoint.x, spawnPoint.y) < 600) continue;
+    const pts: Phaser.Math.Vector2[] = [];
+    for (let j = 0; j < 3; j++) {
+      pts.push(new Phaser.Math.Vector2(
+        cx + Phaser.Math.Between(-30, 30),
+        cy + Phaser.Math.Between(-30, 30)
+      ));
+    }
+    patrolSquadSpawns.push({ points: pts, type: "bandit" });
+  }
+
+  // ── Hidden stashes (secret loot spots, slightly visible) ──
+  const hiddenStashes: Phaser.Math.Vector2[] = [];
+  for (let i = 0; i < 6; i++) {
+    const sx = Phaser.Math.Between(300, MAP_W - 300);
+    const sy = Phaser.Math.Between(300, MAP_H - 300);
+    hiddenStashes.push(new Phaser.Math.Vector2(sx, sy));
+  }
+
+  // ── Friendly NPCs (traders on the map) ──
+  const npcLocations: NPCDef[] = [];
+  const npcDefs = [
+    { name: "Trader", zone: "village" },
+    { name: "Medic", zone: "forest" },
+  ];
+  for (const nd of npcDefs) {
+    let nx: number, ny: number;
+    if (nd.zone === "village") {
+      nx = Phaser.Math.Between(200, MAP_W / 2 - 200);
+      ny = Phaser.Math.Between(MAP_H / 2 + 200, MAP_H - 400);
+    } else {
+      nx = Phaser.Math.Between(200, MAP_W / 2 - 200);
+      ny = Phaser.Math.Between(200, MAP_H / 2 - 200);
+    }
+    const texKey = "npc_trader";
+    const visual = scene.textures.exists(texKey)
+      ? scene.add.sprite(nx, ny, texKey).setDepth(6)
+      : scene.add.rectangle(nx, ny, 12, 12, 0x3050a0).setDepth(6);
+    // NPC label
+    scene.add.text(nx, ny - 14, nd.name, {
+      fontFamily: "monospace", fontSize: "8px", color: "#70a0d0",
+      backgroundColor: "#00000088", padding: { x: 2, y: 1 },
+    }).setOrigin(0.5).setDepth(6);
+    npcLocations.push({ x: nx, y: ny, name: nd.name, visual });
+  }
+
   return {
     walls,
     spawnPoint,
     extractionPoint,
     extractionZone,
+    extractions,
     enemySpawnPoints,
+    bossSpawnPoints,
+    patrolSquadSpawns,
     lootPoints,
+    hiddenStashes,
+    npcLocations,
     hazards,
     doors,
   };

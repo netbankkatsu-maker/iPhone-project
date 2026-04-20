@@ -98,6 +98,18 @@ export const ENEMY_TYPES = {
     radius: 18,
     loot: ["ammo", "medkit", "weapon_part"],
   },
+  boss: {
+    name: "Boss",
+    hp: 300,
+    speed: 60,
+    damage: 35,
+    fireRate: 600,
+    detectionRange: 350,
+    attackRange: 300,
+    color: 0x8a2050,
+    radius: 20,
+    loot: ["medkit", "weapon_part", "weapon_part", "ammo"],
+  },
 } as const;
 
 export type EnemyType = keyof typeof ENEMY_TYPES;

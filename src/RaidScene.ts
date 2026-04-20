@@ -18,7 +18,7 @@ import {
 } from "./constants";
 import { VirtualJoystick } from "./VirtualJoystick";
 import { HUD } from "./HUD";
-import { generateMap, MapData } from "./MapGenerator";
+import { generateMap, MapData, ExtractionDef } from "./MapGenerator";
 import {
   EnemySprite,
   spawnEnemy,
@@ -118,6 +118,31 @@ export class RaidScene extends Phaser.Scene {
   // Stash from base
   private stash: PlayerStash = createDefaultStash();
 
+  // Day/night cycle
+  private dayNightOverlay!: Phaser.GameObjects.Rectangle;
+  private gameTimeMs = 0;         // in-game time in ms (1 real second = 1 in-game minute)
+  private gameHour = 6;           // start at 06:00
+  private gameMinute = 0;
+
+  // Radiation storm event
+  private radStormActive = false;
+  private radStormTimer = 0;
+  private radStormDuration = 0;
+  private radStormOverlay!: Phaser.GameObjects.Rectangle;
+  private nextStormTime = 0;
+
+  // NPC interaction
+  private nearbyNPC: { x: number; y: number; name: string } | null = null;
+  private npcButtonBg!: Phaser.GameObjects.Rectangle;
+  private npcButtonLabel!: Phaser.GameObjects.Text;
+
+  // Crafting recipes
+  private static RECIPES = [
+    { inputs: [{ id: "bandage", qty: 2 }, { id: "scrap_metal", qty: 1 }], output: "medkit", outQty: 1 },
+    { inputs: [{ id: "scrap_metal", qty: 3 }], output: "ammo_pistol", outQty: 12 },
+    { inputs: [{ id: "scrap_metal", qty: 5 }], output: "ammo_rifle", outQty: 10 },
+  ];
+
   constructor() {
     super("RaidScene");
   }
@@ -180,8 +205,8 @@ export class RaidScene extends Phaser.Scene {
     // Fog of War
     this.fog = new FogOfWar(this);
 
-    // Minimap
-    this.minimap = new Minimap(this, this.mapData.extractionPoint.x, this.mapData.extractionPoint.y);
+    // Minimap (pass all extraction points)
+    this.minimap = new Minimap(this, this.mapData.extractions.map(e => ({ x: e.point.x, y: e.point.y })));
 
     // Audio
     this.audio = new AudioManager();
@@ -330,7 +355,43 @@ export class RaidScene extends Phaser.Scene {
           return;
         }
       }
+
+      // NPC button hit test
+      if (this.npcButtonBg.visible && this.nearbyNPC) {
+        const nbx = this.npcButtonBg.x;
+        const nby = this.npcButtonBg.y;
+        if (px >= nbx - 40 && px <= nbx + 40 && py >= nby - 16 && py <= nby + 16) {
+          this.openNPCShop();
+          return;
+        }
+      }
     });
+
+    // ── Day/night overlay ──
+    this.dayNightOverlay = this.add.rectangle(0, 0, w * 4, h * 4, 0x000020, 0)
+      .setScrollFactor(0).setDepth(45);
+
+    // ── Radiation storm overlay ──
+    this.radStormOverlay = this.add.rectangle(0, 0, w * 4, h * 4, 0x304010, 0)
+      .setScrollFactor(0).setDepth(44);
+    this.nextStormTime = Phaser.Math.Between(60000, 120000);
+
+    // ── NPC interaction button ──
+    this.npcButtonBg = this.add.rectangle(w / 2, h * 0.55, 80, 32, 0x3050a0, 0.85)
+      .setScrollFactor(0).setDepth(HUD_DEPTH + 2).setVisible(false);
+    this.npcButtonBg.setStrokeStyle(1.5, 0x5070c0);
+    this.npcButtonLabel = this.add.text(w / 2, h * 0.55, "TRADE", {
+      fontFamily: "monospace", fontSize: "13px", color: "#d0e0ff",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(HUD_DEPTH + 3).setVisible(false);
+
+    // ── Spawn bosses ──
+    this.spawnBosses();
+
+    // ── Spawn patrol squads ──
+    this.spawnPatrolSquads();
+
+    // ── Spawn hidden stashes ──
+    this.spawnHiddenStashes();
 
     // Resize handler
     this.scale.on("resize", this.onResize, this);
@@ -452,6 +513,8 @@ export class RaidScene extends Phaser.Scene {
     this.hud.onResize();
     this.lootButtonBg.setPosition(w / 2, h * 0.6);
     this.lootButtonLabel.setPosition(w / 2, h * 0.6);
+    this.npcButtonBg.setPosition(w / 2, h * 0.55);
+    this.npcButtonLabel.setPosition(w / 2, h * 0.55);
   }
 
   update(_time: number, delta: number) {
@@ -565,7 +628,16 @@ export class RaidScene extends Phaser.Scene {
     // Fog of War
     this.fog.update(this.player.x, this.player.y);
 
-    // Extraction check
+    // Day/night cycle
+    this.updateDayNight(delta);
+
+    // Radiation storm events
+    this.updateRadStorm(delta);
+
+    // NPC proximity check
+    this.checkNPCProximity();
+
+    // Extraction check (multiple points)
     this.checkExtraction(delta);
 
     // Update HUD
@@ -765,33 +837,30 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private checkExtraction(delta: number) {
-    const dist = Phaser.Math.Distance.Between(
-      this.player.x,
-      this.player.y,
-      this.mapData.extractionPoint.x,
-      this.mapData.extractionPoint.y
-    );
-
-    if (dist < EXTRACTION_RADIUS) {
-      this.isExtracting = true;
-      this.extractionProgress += delta;
-      this.hud.showExtracting(true, this.extractionProgress / EXTRACTION_TIME, EXTRACTION_TIME);
-
-      if (this.extractionProgress >= EXTRACTION_TIME) {
-        this.extract();
+    let nearAny = false;
+    for (const ext of this.mapData.extractions) {
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x, this.player.y, ext.point.x, ext.point.y
+      );
+      if (dist < EXTRACTION_RADIUS) {
+        nearAny = true;
+        this.isExtracting = true;
+        this.extractionProgress += delta;
+        this.hud.showExtracting(true, this.extractionProgress / EXTRACTION_TIME, EXTRACTION_TIME);
+        if (this.extractionProgress >= EXTRACTION_TIME) {
+          this.extract();
+        }
+        break;
       }
-    } else {
+    }
+    if (!nearAny) {
       if (this.isExtracting) {
         this.extractionProgress = Math.max(0, this.extractionProgress - delta * 2);
         if (this.extractionProgress <= 0) {
           this.isExtracting = false;
           this.hud.showExtracting(false);
         } else {
-          this.hud.showExtracting(
-            true,
-            this.extractionProgress / EXTRACTION_TIME,
-            EXTRACTION_TIME
-          );
+          this.hud.showExtracting(true, this.extractionProgress / EXTRACTION_TIME, EXTRACTION_TIME);
         }
       }
     }
@@ -943,15 +1012,194 @@ export class RaidScene extends Phaser.Scene {
   private checkRadZones(deltaSec: number) {
     for (const rz of this.radZones) {
       const dist = Phaser.Math.Distance.Between(
-        this.player.x,
-        this.player.y,
-        rz.x,
-        rz.y
+        this.player.x, this.player.y, rz.x, rz.y
       );
       if (dist < rz.radius) {
         addRadiation(this.survival, 8 * deltaSec);
       }
     }
+  }
+
+  // ── Day/Night Cycle ──
+  private updateDayNight(delta: number) {
+    // 1 real second = 1 in-game minute → full day in 24 real minutes
+    this.gameTimeMs += delta;
+    if (this.gameTimeMs >= 1000) {
+      this.gameTimeMs -= 1000;
+      this.gameMinute++;
+      if (this.gameMinute >= 60) {
+        this.gameMinute = 0;
+        this.gameHour = (this.gameHour + 1) % 24;
+      }
+    }
+
+    const timeStr = `${String(this.gameHour).padStart(2, "0")}:${String(this.gameMinute).padStart(2, "0")}`;
+    const isNight = this.gameHour >= 20 || this.gameHour < 5;
+    const isDusk = this.gameHour >= 18 && this.gameHour < 20;
+    const isDawn = this.gameHour >= 5 && this.gameHour < 7;
+
+    let darkness = 0;
+    if (isNight) darkness = 0.45;
+    else if (isDusk) darkness = ((this.gameHour - 18) * 60 + this.gameMinute) / 120 * 0.45;
+    else if (isDawn) darkness = 0.45 - ((this.gameHour - 5) * 60 + this.gameMinute) / 120 * 0.45;
+
+    this.dayNightOverlay.setAlpha(darkness);
+    this.hud.updateTime(timeStr, isNight);
+  }
+
+  // ── Radiation Storm Events ──
+  private updateRadStorm(delta: number) {
+    this.radStormTimer += delta;
+
+    if (!this.radStormActive) {
+      if (this.radStormTimer >= this.nextStormTime) {
+        // Start storm
+        this.radStormActive = true;
+        this.radStormTimer = 0;
+        this.radStormDuration = Phaser.Math.Between(15000, 30000);
+        this.hud.showEvent("RAD STORM - FIND SHELTER!");
+        this.tweens.add({
+          targets: this.radStormOverlay,
+          alpha: 0.2,
+          duration: 2000,
+        });
+      }
+    } else {
+      // Storm active - damage player if outdoors
+      const deltaSec = delta / 1000;
+      addRadiation(this.survival, 5 * deltaSec);
+      // Check if inside a building (rough check - near any room center)
+      let isIndoors = false;
+      for (const door of this.mapData.doors) {
+        if (Phaser.Math.Distance.Between(this.player.x, this.player.y, door.x, door.y) < 200) {
+          isIndoors = true;
+          break;
+        }
+      }
+      if (!isIndoors) {
+        this.takeDamage(1.5 * deltaSec);
+      }
+
+      if (this.radStormTimer >= this.radStormDuration) {
+        // End storm
+        this.radStormActive = false;
+        this.radStormTimer = 0;
+        this.nextStormTime = Phaser.Math.Between(60000, 150000);
+        this.hud.hideEvent();
+        this.tweens.add({
+          targets: this.radStormOverlay,
+          alpha: 0,
+          duration: 3000,
+        });
+      }
+    }
+  }
+
+  // ── Boss spawning ──
+  private spawnBosses() {
+    for (const pt of this.mapData.bossSpawnPoints) {
+      spawnEnemy(this, pt.x, pt.y, "boss", this.enemies, this.mapData.walls);
+    }
+  }
+
+  // ── Patrol squads ──
+  private spawnPatrolSquads() {
+    for (const squad of this.mapData.patrolSquadSpawns) {
+      for (const pt of squad.points) {
+        spawnEnemy(this, pt.x, pt.y, squad.type as EnemyType, this.enemies, this.mapData.walls);
+      }
+    }
+  }
+
+  // ── Hidden stashes ──
+  private spawnHiddenStashes() {
+    for (const pt of this.mapData.hiddenStashes) {
+      const texKey = "stash_hidden";
+      const stash = this.textures.exists(texKey)
+        ? this.add.sprite(pt.x, pt.y, texKey).setAlpha(0.5)
+        : this.add.rectangle(pt.x, pt.y, 10, 10, 0x605020, 0.35);
+      this.physics.add.existing(stash, true);
+      stash.setDepth(1);
+
+      const lootInv = new GridInventory(3, 2);
+      // Rare loot in hidden stashes
+      const rareLoot = ["medkit", "ammo_rifle", "ammo_shotgun", "scrap_metal", "painkiller"];
+      const numItems = Phaser.Math.Between(2, 4);
+      for (let i = 0; i < numItems; i++) {
+        const itemId = rareLoot[Phaser.Math.Between(0, rareLoot.length - 1)];
+        const def = ITEM_DEFS[itemId];
+        const qty = def.stackable ? Phaser.Math.Between(1, def.maxStack) : 1;
+        lootInv.autoAdd(itemId, qty);
+      }
+      // Good chance of weapon or armor
+      if (Math.random() < 0.4) {
+        lootInv.autoAdd(["smg", "shotgun", "rifle"][Phaser.Math.Between(0, 2)], 1);
+      }
+      if (Math.random() < 0.3) {
+        lootInv.autoAdd(Math.random() > 0.5 ? "armor_light" : "armor_heavy", 1);
+      }
+
+      stash.setData("lootInventory", lootInv);
+      this.lootContainers.add(stash);
+    }
+  }
+
+  // ── NPC proximity ──
+  private checkNPCProximity() {
+    this.nearbyNPC = null;
+    let near = false;
+    for (const npc of this.mapData.npcLocations) {
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
+      if (dist < 50) {
+        near = true;
+        this.nearbyNPC = npc;
+        break;
+      }
+    }
+    this.npcButtonBg.setVisible(near);
+    this.npcButtonLabel.setVisible(near);
+  }
+
+  // ── NPC Shop ──
+  private openNPCShop() {
+    if (!this.nearbyNPC) return;
+    const lootInv = new GridInventory(5, 3);
+
+    if (this.nearbyNPC.name === "Trader") {
+      lootInv.autoAdd("ammo_pistol", 30);
+      lootInv.autoAdd("ammo_rifle", 20);
+      lootInv.autoAdd("ammo_shotgun", 12);
+      lootInv.autoAdd("bandage", 3);
+      lootInv.autoAdd("canned_food", 2);
+      lootInv.autoAdd("water", 2);
+      if (Math.random() < 0.3) lootInv.autoAdd("smg", 1);
+    } else {
+      // Medic
+      lootInv.autoAdd("bandage", 5);
+      lootInv.autoAdd("medkit", 2);
+      lootInv.autoAdd("painkiller", 3);
+      lootInv.autoAdd("water", 3);
+    }
+
+    this.inventoryUI.open(lootInv);
+  }
+
+  // ── Crafting (called from inventory) ──
+  public tryCraft(): boolean {
+    for (const recipe of RaidScene.RECIPES) {
+      let canCraft = true;
+      for (const inp of recipe.inputs) {
+        if (this.inventory.countItem(inp.id) < inp.qty) { canCraft = false; break; }
+      }
+      if (canCraft) {
+        for (const inp of recipe.inputs) {
+          this.inventory.consumeItem(inp.id, inp.qty);
+        }
+        this.inventory.autoAdd(recipe.output, recipe.outQty);
+        return true;
+      }
+    }
+    return false;
   }
 }
 

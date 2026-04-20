@@ -13,8 +13,7 @@ export class Minimap {
 
   constructor(
     scene: Phaser.Scene,
-    extractionX: number,
-    extractionY: number
+    extractions: { x: number; y: number }[]
   ) {
     this.scene = scene;
 
@@ -25,19 +24,21 @@ export class Minimap {
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 5);
 
-    // Background (dark, semi-transparent)
+    // Background
     const bg = scene.add.rectangle(MM_SIZE / 2, MM_SIZE / 2, MM_SIZE, MM_SIZE, 0x0a0e06, 0.8);
     bg.setStrokeStyle(1, 0x2a2a1a);
     this.container.add(bg);
 
-    // Extraction marker
-    const extractDot = scene.add.circle(
-      (extractionX / MAP_W) * MM_SIZE,
-      (extractionY / MAP_H) * MM_SIZE,
-      3,
-      0x308880
-    );
-    this.container.add(extractDot);
+    // Multiple extraction markers
+    for (const ext of extractions) {
+      const extractDot = scene.add.circle(
+        (ext.x / MAP_W) * MM_SIZE,
+        (ext.y / MAP_H) * MM_SIZE,
+        3,
+        0x308880
+      );
+      this.container.add(extractDot);
+    }
 
     // Pre-create enemy dot pool
     for (let i = 0; i < MAX_ENEMY_DOTS; i++) {

@@ -22,6 +22,7 @@ const TEXTURE_MAP: Record<EnemyType, string> = {
   bandit: "enemy_bandit",
   mutant: "enemy_mutant",
   heavy: "enemy_heavy",
+  boss: "enemy_boss",
 };
 
 export function spawnEnemy(
