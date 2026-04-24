@@ -32,6 +32,8 @@ export function generateTextures(scene: Phaser.Scene) {
   createGrassTex(g, scene);
   createNPCTex(g, scene);
   createStashTex(g, scene);
+  createItemTextures(g, scene);
+  createVillageNPCs(g, scene);
 
   g.destroy();
 }
@@ -313,11 +315,189 @@ function createNPCTex(g: Phaser.GameObjects.Graphics, scene: Phaser.Scene) {
 
 function createStashTex(g: Phaser.GameObjects.Graphics, scene: Phaser.Scene) {
   const s = 10; g.clear();
-  // Hidden stash (partially buried box)
   g.fillStyle(0x605020, 0.6); g.fillRect(1, 2, 8, 6);
   g.fillStyle(0x706028, 0.5); g.fillRect(2, 3, 6, 2);
-  // Dirt covering
   g.fillStyle(0x1a1e10, 0.4); g.fillRect(0, 0, 10, 3);
   g.fillStyle(0x1a1e10, 0.3); g.fillRect(0, 7, 10, 3);
   g.generateTexture("stash_hidden", s, s);
+}
+
+function createItemTextures(g: Phaser.GameObjects.Graphics, scene: Phaser.Scene) {
+  const S = 16;
+
+  // ── item_pistol ──
+  g.clear();
+  px(g, 8, 2, 0x505050); px(g, 10, 2, 0x606060);
+  px(g, 4, 4, 0x606060); px(g, 6, 4, 0x707070); px(g, 8, 4, 0x606060); px(g, 10, 4, 0x505050);
+  px(g, 4, 6, 0x555555); px(g, 6, 6, 0x4a4a48);
+  px(g, 6, 8, 0x404040);
+  px(g, 4, 8, 0x503820); px(g, 4, 10, 0x503820);
+  px(g, 4, 12, 0x402818);
+  g.generateTexture("item_pistol", S, S);
+
+  // ── item_smg ──
+  g.clear();
+  px(g, 10, 2, 0x505050); px(g, 12, 2, 0x606060); px(g, 14, 2, 0x505050);
+  px(g, 2, 4, 0x404040); px(g, 4, 4, 0x555555); px(g, 6, 4, 0x606060); px(g, 8, 4, 0x707070);
+  px(g, 10, 4, 0x606060); px(g, 12, 4, 0x505050);
+  px(g, 4, 6, 0x555555); px(g, 6, 6, 0x4a4a48); px(g, 8, 6, 0x4a4a48);
+  px(g, 6, 8, 0x505050); px(g, 6, 10, 0x505050);
+  px(g, 4, 8, 0x503820);
+  g.generateTexture("item_smg", S, S);
+
+  // ── item_shotgun ──
+  g.clear();
+  px(g, 0, 4, 0x604020); px(g, 2, 4, 0x604020);
+  px(g, 4, 4, 0x505050); px(g, 6, 4, 0x606060); px(g, 8, 4, 0x606060);
+  px(g, 10, 4, 0x707070); px(g, 12, 4, 0x606060); px(g, 14, 4, 0x505050);
+  px(g, 4, 6, 0x555555); px(g, 6, 6, 0x4a4a48);
+  px(g, 8, 6, 0x606060);
+  px(g, 4, 8, 0x503820);
+  px(g, 12, 2, 0x404040); px(g, 14, 2, 0x404040);
+  g.generateTexture("item_shotgun", S, S);
+
+  // ── item_rifle ──
+  g.clear();
+  px(g, 0, 6, 0x604020); px(g, 2, 6, 0x604020);
+  px(g, 4, 6, 0x555555); px(g, 6, 6, 0x606060); px(g, 8, 6, 0x707070);
+  px(g, 10, 6, 0x606060); px(g, 12, 6, 0x505050); px(g, 14, 6, 0x404040);
+  px(g, 4, 8, 0x4a4a48); px(g, 6, 8, 0x4a4a48);
+  px(g, 4, 10, 0x503820);
+  px(g, 8, 4, 0x303040); px(g, 10, 4, 0x303040);
+  px(g, 8, 2, 0x404050);
+  g.generateTexture("item_rifle", S, S);
+
+  // ── item_ammo_pistol ──
+  g.clear();
+  px(g, 2, 2, 0x806830); px(g, 4, 2, 0x907838); px(g, 6, 2, 0x907838); px(g, 8, 2, 0x806830);
+  px(g, 2, 4, 0xa08840); px(g, 4, 4, 0xb09848); px(g, 6, 4, 0xb09848); px(g, 8, 4, 0xa08840);
+  px(g, 2, 6, 0x806830); px(g, 4, 6, 0x907838); px(g, 6, 6, 0x907838); px(g, 8, 6, 0x806830);
+  px(g, 2, 8, 0x806830); px(g, 4, 8, 0x806830); px(g, 6, 8, 0x806830); px(g, 8, 8, 0x806830);
+  px(g, 4, 10, 0xd0b060); px(g, 6, 10, 0xd0b060);
+  g.generateTexture("item_ammo_pistol", S, S);
+
+  // ── item_ammo_rifle ──
+  g.clear();
+  px(g, 2, 2, 0x405030); px(g, 4, 2, 0x506038); px(g, 6, 2, 0x506038); px(g, 8, 2, 0x405030);
+  px(g, 2, 4, 0x607040); px(g, 4, 4, 0x708048); px(g, 6, 4, 0x708048); px(g, 8, 4, 0x607040);
+  px(g, 2, 6, 0x405030); px(g, 4, 6, 0x506038); px(g, 6, 6, 0x506038); px(g, 8, 6, 0x405030);
+  px(g, 2, 8, 0x405030); px(g, 4, 8, 0x405030); px(g, 6, 8, 0x405030); px(g, 8, 8, 0x405030);
+  px(g, 4, 10, 0x90a060); px(g, 6, 10, 0x90a060);
+  g.generateTexture("item_ammo_rifle", S, S);
+
+  // ── item_ammo_shotgun ──
+  g.clear();
+  px(g, 2, 2, 0x803020); px(g, 4, 2, 0x903828); px(g, 6, 2, 0x903828); px(g, 8, 2, 0x803020);
+  px(g, 2, 4, 0xa04830); px(g, 4, 4, 0xb05838); px(g, 6, 4, 0xb05838); px(g, 8, 4, 0xa04830);
+  px(g, 2, 6, 0x803020); px(g, 4, 6, 0x903828); px(g, 6, 6, 0x903828); px(g, 8, 6, 0x803020);
+  px(g, 4, 8, 0xd07040); px(g, 6, 8, 0xd07040);
+  px(g, 2, 10, 0xc06838); px(g, 8, 10, 0xc06838);
+  g.generateTexture("item_ammo_shotgun", S, S);
+
+  // ── item_bandage ──
+  g.clear();
+  px(g, 4, 2, 0xd0d0c8); px(g, 6, 2, 0xe0e0d8);
+  px(g, 2, 4, 0xd0d0c8); px(g, 4, 4, 0xf0f0e8); px(g, 6, 4, 0xf0f0e8); px(g, 8, 4, 0xd0d0c8);
+  px(g, 2, 6, 0xd0d0c8); px(g, 4, 6, 0xe0e0d8); px(g, 6, 6, 0xe0e0d8); px(g, 8, 6, 0xd0d0c8);
+  px(g, 4, 8, 0xd0d0c8); px(g, 6, 8, 0xc0c0b8);
+  px(g, 4, 10, 0xb0b0a8);
+  g.generateTexture("item_bandage", S, S);
+
+  // ── item_medkit ──
+  g.clear();
+  px(g, 2, 2, 0xd0d0c8); px(g, 4, 2, 0xd0d0c8); px(g, 6, 2, 0xd0d0c8); px(g, 8, 2, 0xd0d0c8); px(g, 10, 2, 0xd0d0c8);
+  px(g, 2, 4, 0xe0e0d8); px(g, 4, 4, 0xe0e0d8); px(g, 6, 4, 0xc03030); px(g, 8, 4, 0xe0e0d8); px(g, 10, 4, 0xe0e0d8);
+  px(g, 2, 6, 0xe0e0d8); px(g, 4, 6, 0xc03030); px(g, 6, 6, 0xc03030); px(g, 8, 6, 0xc03030); px(g, 10, 6, 0xe0e0d8);
+  px(g, 2, 8, 0xe0e0d8); px(g, 4, 8, 0xe0e0d8); px(g, 6, 8, 0xc03030); px(g, 8, 8, 0xe0e0d8); px(g, 10, 8, 0xe0e0d8);
+  px(g, 2, 10, 0xd0d0c8); px(g, 4, 10, 0xd0d0c8); px(g, 6, 10, 0xd0d0c8); px(g, 8, 10, 0xd0d0c8); px(g, 10, 10, 0xd0d0c8);
+  g.generateTexture("item_medkit", S, S);
+
+  // ── item_painkiller ──
+  g.clear();
+  px(g, 4, 0, 0x9060b0); px(g, 6, 0, 0x9060b0);
+  px(g, 4, 2, 0x806098); px(g, 6, 2, 0x806098);
+  px(g, 4, 4, 0xe0e0d8); px(g, 6, 4, 0xe0e0d8);
+  px(g, 4, 6, 0xf0f0e8); px(g, 6, 6, 0xf0f0e8);
+  px(g, 4, 8, 0xe0e0d8); px(g, 6, 8, 0xe0e0d8);
+  px(g, 4, 10, 0xd0d0c8); px(g, 6, 10, 0xd0d0c8);
+  px(g, 4, 12, 0xd0d0c8); px(g, 6, 12, 0xd0d0c8);
+  g.generateTexture("item_painkiller", S, S);
+
+  // ── item_canned_food ──
+  g.clear();
+  px(g, 4, 0, 0x808078); px(g, 6, 0, 0x808078);
+  px(g, 2, 2, 0x707068); px(g, 4, 2, 0x909088); px(g, 6, 2, 0x909088); px(g, 8, 2, 0x707068);
+  px(g, 2, 4, 0x806830); px(g, 4, 4, 0xa08840); px(g, 6, 4, 0xa08840); px(g, 8, 4, 0x806830);
+  px(g, 2, 6, 0x806830); px(g, 4, 6, 0x907838); px(g, 6, 6, 0x907838); px(g, 8, 6, 0x806830);
+  px(g, 2, 8, 0x707068); px(g, 4, 8, 0x808078); px(g, 6, 8, 0x808078); px(g, 8, 8, 0x707068);
+  px(g, 4, 10, 0x707068); px(g, 6, 10, 0x707068);
+  g.generateTexture("item_canned_food", S, S);
+
+  // ── item_water ──
+  g.clear();
+  px(g, 4, 0, 0x4080a0); px(g, 6, 0, 0x4080a0);
+  px(g, 4, 2, 0x3070a0); px(g, 6, 2, 0x3070a0);
+  px(g, 2, 4, 0x2060a0); px(g, 4, 4, 0x4090c0); px(g, 6, 4, 0x4090c0); px(g, 8, 4, 0x2060a0);
+  px(g, 2, 6, 0x2060a0); px(g, 4, 6, 0x50a0d0); px(g, 6, 6, 0x50a0d0); px(g, 8, 6, 0x2060a0);
+  px(g, 2, 8, 0x2060a0); px(g, 4, 8, 0x4090c0); px(g, 6, 8, 0x4090c0); px(g, 8, 8, 0x2060a0);
+  px(g, 4, 10, 0x2060a0); px(g, 6, 10, 0x2060a0);
+  g.generateTexture("item_water", S, S);
+
+  // ── item_scrap_metal ──
+  g.clear();
+  px(g, 2, 2, 0x708090); px(g, 4, 4, 0x607080);
+  px(g, 6, 2, 0x506070); px(g, 8, 6, 0x708090);
+  px(g, 10, 4, 0x607080); px(g, 2, 8, 0x506070);
+  px(g, 6, 8, 0x809098); px(g, 8, 10, 0x708090);
+  px(g, 4, 6, 0x809098); px(g, 10, 8, 0x506070);
+  px(g, 0, 6, 0x607080); px(g, 12, 6, 0x607080);
+  g.generateTexture("item_scrap_metal", S, S);
+
+  // ── item_armor_light ──
+  g.clear();
+  px(g, 4, 0, 0x506858); px(g, 6, 0, 0x607868); px(g, 8, 0, 0x506858);
+  px(g, 2, 2, 0x405848); px(g, 4, 2, 0x607868); px(g, 6, 2, 0x708878); px(g, 8, 2, 0x607868); px(g, 10, 2, 0x405848);
+  px(g, 2, 4, 0x405848); px(g, 4, 4, 0x607868); px(g, 6, 4, 0x607868); px(g, 8, 4, 0x607868); px(g, 10, 4, 0x405848);
+  px(g, 4, 6, 0x506858); px(g, 6, 6, 0x607868); px(g, 8, 6, 0x506858);
+  px(g, 4, 8, 0x506858); px(g, 6, 8, 0x506858); px(g, 8, 8, 0x506858);
+  px(g, 4, 10, 0x405848); px(g, 8, 10, 0x405848);
+  g.generateTexture("item_armor_light", S, S);
+
+  // ── item_armor_heavy ──
+  g.clear();
+  px(g, 4, 0, 0x384850); px(g, 6, 0, 0x485860); px(g, 8, 0, 0x384850);
+  px(g, 2, 2, 0x304048); px(g, 4, 2, 0x485860); px(g, 6, 2, 0x586870); px(g, 8, 2, 0x485860); px(g, 10, 2, 0x304048);
+  px(g, 0, 4, 0x304048); px(g, 2, 4, 0x384850); px(g, 4, 4, 0x586870); px(g, 6, 4, 0x687880); px(g, 8, 4, 0x586870); px(g, 10, 4, 0x384850); px(g, 12, 4, 0x304048);
+  px(g, 2, 6, 0x384850); px(g, 4, 6, 0x485860); px(g, 6, 6, 0x586870); px(g, 8, 6, 0x485860); px(g, 10, 6, 0x384850);
+  px(g, 4, 8, 0x384850); px(g, 6, 8, 0x485860); px(g, 8, 8, 0x384850);
+  px(g, 4, 10, 0x304048); px(g, 6, 10, 0x384850); px(g, 8, 10, 0x304048);
+  px(g, 4, 12, 0x304048); px(g, 8, 12, 0x304048);
+  g.generateTexture("item_armor_heavy", S, S);
+}
+
+function createVillageNPCs(g: Phaser.GameObjects.Graphics, scene: Phaser.Scene) {
+  const s = 14;
+
+  // ── npc_gunsmith (gray clothes, wrench) ──
+  g.clear();
+  px(g, 4, 4, 0x505050); px(g, 6, 4, 0x505050); px(g, 8, 4, 0x505050);
+  px(g, 4, 6, 0x484848); px(g, 6, 6, 0x606060); px(g, 8, 6, 0x484848);
+  px(g, 4, 8, 0x505050); px(g, 8, 8, 0x505050);
+  px(g, 4, 2, 0xd0a080); px(g, 6, 2, 0xd0a080); px(g, 8, 2, 0xd0a080);
+  px(g, 4, 0, 0x404040); px(g, 6, 0, 0x404040); px(g, 8, 0, 0x404040);
+  px(g, 2, 6, 0x484848); px(g, 10, 6, 0x808080);
+  px(g, 10, 4, 0x909090);
+  px(g, 4, 10, 0x303028); px(g, 8, 10, 0x303028);
+  g.generateTexture("npc_gunsmith", s, s);
+
+  // ── npc_upgrade (orange clothes, tech) ──
+  g.clear();
+  px(g, 4, 4, 0xa07020); px(g, 6, 4, 0xa07020); px(g, 8, 4, 0xa07020);
+  px(g, 4, 6, 0x906018); px(g, 6, 6, 0xb08030); px(g, 8, 6, 0x906018);
+  px(g, 4, 8, 0xa07020); px(g, 8, 8, 0xa07020);
+  px(g, 4, 2, 0xd0a080); px(g, 6, 2, 0xd0a080); px(g, 8, 2, 0xd0a080);
+  px(g, 4, 0, 0xc0a020); px(g, 6, 0, 0xc0a020); px(g, 8, 0, 0xc0a020);
+  px(g, 2, 6, 0x906018); px(g, 10, 6, 0x906018);
+  px(g, 4, 10, 0x303028); px(g, 8, 10, 0x303028);
+  g.generateTexture("npc_upgrade", s, s);
 }

@@ -355,8 +355,13 @@ export class InventoryUI {
         const tc = TYPE_COLORS[def.type] || TYPE_COLORS.material;
         this.ui(this.scene.add.rectangle(cx, cy, slotW - 4, slotH - 4, tc.bg, 0.9), HUD_DEPTH + 51)
           .setStrokeStyle(2, tc.border);
-        this.ui(this.scene.add.text(cx, cy, def.name, {
-          fontFamily: "monospace", fontSize: "13px", color: "#e8e0d0", fontStyle: "bold",
+        const eqTexKey = "item_" + equipped.defId;
+        if (this.scene.textures.exists(eqTexKey)) {
+          const s = this.scene.add.sprite(cx, cy - 6, eqTexKey).setScale(2);
+          this.ui(s, HUD_DEPTH + 52);
+        }
+        this.ui(this.scene.add.text(cx, cy + 10, def.name, {
+          fontFamily: "monospace", fontSize: "10px", color: "#e8e0d0",
         }).setOrigin(0.5), HUD_DEPTH + 52);
 
         const capturedKey = slotDef.key;
@@ -423,16 +428,29 @@ export class InventoryUI {
         padding: { x: 3, y: 1 },
       }), HUD_DEPTH + 52);
 
-      // Item name (center, BIG)
+      // Item icon (center)
+      const texKey = "item_" + item.defId;
       const hasQty = def.stackable && item.quantity > 1;
-      this.ui(this.scene.add.text(cx, cy - (hasQty ? 7 : 0), def.name, {
-        fontFamily: "monospace", fontSize: "14px", color: "#f0e8d8", fontStyle: "bold",
+      if (this.scene.textures.exists(texKey)) {
+        const iconScale = Math.min((iw - 16) / 16, (ih - (hasQty ? 20 : 10)) / 16);
+        const sprite = this.scene.add.sprite(cx, cy - (hasQty ? 6 : 0), texKey);
+        sprite.setScale(Math.max(1.5, iconScale));
+        this.ui(sprite, HUD_DEPTH + 52);
+      } else {
+        this.ui(this.scene.add.text(cx, cy - (hasQty ? 6 : 0), def.name, {
+          fontFamily: "monospace", fontSize: "12px", color: "#f0e8d8", fontStyle: "bold",
+        }).setOrigin(0.5), HUD_DEPTH + 52);
+      }
+
+      // Item name (small, below icon)
+      this.ui(this.scene.add.text(cx, cy + (hasQty ? 4 : 8), def.name, {
+        fontFamily: "monospace", fontSize: "8px", color: "#a09880",
       }).setOrigin(0.5), HUD_DEPTH + 52);
 
-      // Quantity (below name, big)
+      // Quantity
       if (hasQty) {
-        this.ui(this.scene.add.text(cx, cy + 10, `x${item.quantity}`, {
-          fontFamily: "monospace", fontSize: "14px", color: "#d4a840", fontStyle: "bold",
+        this.ui(this.scene.add.text(cx, cy + 14, `x${item.quantity}`, {
+          fontFamily: "monospace", fontSize: "12px", color: "#d4a840", fontStyle: "bold",
         }).setOrigin(0.5), HUD_DEPTH + 52);
       }
 
