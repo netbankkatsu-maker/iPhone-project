@@ -120,6 +120,13 @@ export class BaseScene extends Phaser.Scene {
       fontFamily: "monospace", fontSize: "8px", color: "#308880",
     }).setOrigin(0.5);
 
+    // ── Multiplayer zone ──
+    const mpZone = this.add.circle(400, 540, 25, 0x6060c0, 0.25);
+    this.tweens.add({ targets: mpZone, alpha: 0.1, duration: 1000, yoyo: true, repeat: -1 });
+    this.add.text(400, 558, "CO-OP", {
+      fontFamily: "monospace", fontSize: "8px", color: "#6080c0",
+    }).setOrigin(0.5);
+
     // ── Player ──
     this.player = this.physics.add.sprite(VILLAGE_W / 2, VILLAGE_H / 2 + 40, "player_alive");
     this.player.setCollideWorldBounds(true);
@@ -178,6 +185,14 @@ export class BaseScene extends Phaser.Scene {
     if (deployDist < 40 && !this.interactTarget) {
       this.interactBtn.setVisible(true);
       (this.interactBtn.getAt(1) as Phaser.GameObjects.Text).setText("DEPLOY");
+      return;
+    }
+
+    // Co-op zone check
+    const coopDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, 400, 540);
+    if (coopDist < 35 && !this.interactTarget) {
+      this.interactBtn.setVisible(true);
+      (this.interactBtn.getAt(1) as Phaser.GameObjects.Text).setText("CO-OP");
       return;
     }
 
@@ -296,6 +311,13 @@ export class BaseScene extends Phaser.Scene {
     const deployDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, 640, 540);
     if (deployDist < 40 && !this.interactTarget) {
       this.scene.start("RaidScene", { stash: this.stash });
+      return;
+    }
+
+    // Co-op zone
+    const coopDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, 400, 540);
+    if (coopDist < 35 && !this.interactTarget) {
+      this.scene.start("LobbyScene", { stash: this.stash });
       return;
     }
 

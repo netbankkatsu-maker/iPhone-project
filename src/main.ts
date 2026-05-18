@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { BaseScene } from "./BaseScene";
 import { RaidScene } from "./RaidScene";
+import { LobbyScene } from "./LobbyScene";
+import { MultiRaidScene } from "./MultiRaidScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -18,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BaseScene, RaidScene],
+  scene: [BaseScene, RaidScene, LobbyScene, MultiRaidScene],
   input: {
     activePointers: 3,
   },
